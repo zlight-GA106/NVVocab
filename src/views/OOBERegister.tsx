@@ -53,7 +53,7 @@ export default function OOBERegister() {
     }
 
     if (!loading && isAuthenticated) {
-      navigate('/import?setup=1', { replace: true });
+      navigate('/', { replace: true });
     }
   }, [hasClient, isAuthenticated, loading, navigate]);
 
@@ -62,7 +62,7 @@ export default function OOBERegister() {
 
     const registered = await signUp(email, password);
     if (registered) {
-      navigate('/import?setup=1', { replace: true });
+      navigate('/', { replace: true });
     }
   };
 

@@ -10,6 +10,7 @@ import {
   Printer,
   Tags,
   Trash2,
+  Volume2,
 } from 'lucide-react';
 import M3Dialog from '../components/M3Dialog';
 import M3Select, { type M3SelectOption } from '../components/M3Select';
@@ -56,12 +57,14 @@ function WordCard({
   isDeleting,
   isQueued,
   onDelete,
+  onSpeak,
   onTogglePrintQueue,
   word,
 }: {
   isDeleting: boolean;
   isQueued: boolean;
   onDelete: (word: WordItem) => void;
+  onSpeak: (word: WordItem) => void;
   onTogglePrintQueue: (word: WordItem) => void;
   word: WordItem;
 }) {
@@ -80,6 +83,16 @@ function WordCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            aria-label={`播放 ${word.words}`}
+            className="inline-flex size-8 items-center justify-center rounded-full transition-colors hover:bg-[#f3edf7] dark:hover:bg-[#2b2930]"
+            onClick={() => onSpeak(word)}
+            style={{ color: 'rgb(var(--m3-primary))' }}
+            title="播放发音"
+            type="button"
+          >
+            <Volume2 aria-hidden="true" className="size-4" strokeWidth={2} />
+          </button>
           <button
             aria-label={isQueued ? `从打印候选移除 ${word.words}` : `加入打印候选 ${word.words}`}
             className="inline-flex size-8 items-center justify-center rounded-full transition-colors hover:bg-[#f3edf7] dark:hover:bg-[#2b2930]"
@@ -212,6 +225,18 @@ export default function Lexicon() {
 
   const handleTogglePrintQueue = (word: WordItem) => {
     printQueue.toggle(word.id);
+  };
+
+  const handleSpeakWord = (word: WordItem) => {
+    if (!('speechSynthesis' in window)) {
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word.words);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
   };
 
   return (
@@ -361,6 +386,7 @@ export default function Lexicon() {
                 isQueued={printQueue.has(word.id)}
                 key={word.id}
                 onDelete={handleDeleteWord}
+                onSpeak={handleSpeakWord}
                 onTogglePrintQueue={handleTogglePrintQueue}
                 word={word}
               />

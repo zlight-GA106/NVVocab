@@ -10,24 +10,24 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: '单词速记首航',
-        short_name: '速记首航',
+        name: 'NVVocab-非易失性词库',
+        short_name: 'NVVocab',
         theme_color: 'rgb(var(--m3-background))',
         background_color: 'rgb(var(--m3-surface))',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           {
-            src: '/favicon.svg',
+            src: '/bwolf.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'maskable',
+            type: 'image/png',
+            purpose: 'any maskable',
           },
           {
-            src: '/favicon.svg',
+            src: '/bwolf.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'maskable',
+            type: 'image/png',
+            purpose: 'any maskable',
           },
         ],
       },

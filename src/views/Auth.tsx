@@ -54,7 +54,7 @@ export default function Auth() {
       mode === 'signIn' ? await signIn(email, password) : await signUp(email, password);
 
     if (authenticated) {
-      navigate('/import', { replace: true });
+      navigate('/', { replace: true });
     }
   };
 
@@ -107,10 +107,10 @@ export default function Auth() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button
                   className="flex h-12 items-center justify-center rounded-full bg-[#6750a4] px-5 text-sm font-medium text-white transition-colors hover:bg-[#5b4398] dark:bg-[#d0bcff] dark:text-[#381e72] dark:hover:bg-[#eaddff]"
-                  onClick={() => navigate('/import')}
+                  onClick={() => navigate('/')}
                   type="button"
                 >
-                  进入导入页
+                  进入仪表板
                 </button>
                 <button
                   className="flex h-12 items-center justify-center gap-2 rounded-full border border-[#79747e] px-5 text-sm font-medium text-[#6750a4] transition-colors hover:bg-[#f3edf7] dark:border-[#938f99] dark:text-[#d0bcff] dark:hover:bg-[#2b2930]"
