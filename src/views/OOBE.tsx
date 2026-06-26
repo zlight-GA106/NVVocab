@@ -159,13 +159,13 @@ export default function OOBE() {
             </div>
             <div className="max-w-2xl space-y-4">
               <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">
-                单词速记首航引导
+                单词速记开箱体验
               </p>
               <h1 className="text-4xl font-normal leading-tight sm:text-5xl">
-                连接你自己的 Supabase 数据库
+                连接到Supabase 数据库
               </h1>
               <p className="max-w-xl text-base leading-7 text-[#49454f] dark:text-[#cac4d0]">
-                本应用采用 BYOB 模式，凭证仅保存在当前设备的浏览器本地存储中。连接测试会读取一次 wordbase 表，成功后进入学习工作区。
+                链接你的supabase数据库，链接凭据将保存在本机浏览器本地存储中
               </p>
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function OOBE() {
               <div>
                 <h2 className="text-xl font-medium leading-7">数据库凭证</h2>
                 <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-                  使用 Supabase Project URL 与 Publishable key。旧项目也可以使用 legacy anon key。
+                  使用 Supabase Project URL 与 Publishable key链接数据库
                 </p>
               </div>
             </div>
@@ -209,7 +209,7 @@ export default function OOBE() {
                 label={SUPABASE_KEY_STORAGE_KEY}
                 name="supabaseKey"
                 onChange={setKey}
-                placeholder="粘贴 sb_publishable 或 legacy anon key"
+                placeholder="粘贴你的 sb_publishable key"
                 type="password"
                 value={key}
               />

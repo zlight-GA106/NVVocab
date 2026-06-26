@@ -1,24 +1,64 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.vite/
+coverage/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.secret
+*.secrets
+
+# Supabase local runtime and private overrides
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.*
+supabase/.secrets/
+supabase/docker-compose.override.yml
+supabase/volumes/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+vite-dev*.log
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editor and IDE state
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

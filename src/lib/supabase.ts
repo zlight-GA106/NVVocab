@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL_STORAGE_KEY = 'WORD_JIFFY_SB_URL';
-export const SUPABASE_KEY_STORAGE_KEY = 'WORD_JIFFY_SB_KEY';
+export const SUPABASE_URL_STORAGE_KEY = '你的 Supabase URL';
+export const SUPABASE_KEY_STORAGE_KEY = '你的 Supabase Publishable key';
 
 type WordbaseRow = {
   id: string;
