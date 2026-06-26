@@ -53,10 +53,6 @@ export function usePracticeWords({
   const currentWord = useMemo(() => words[currentIndex] ?? null, [currentIndex, words]);
 
   const fetchPracticeWords = useCallback(async () => {
-    if (!enabled) {
-      return;
-    }
-
     const supabase = getSupabaseClient();
 
     if (!supabase) {
@@ -111,7 +107,7 @@ export function usePracticeWords({
     } finally {
       setLoading(false);
     }
-  }, [bookTag, enabled, limit, sortMode]);
+  }, [bookTag, limit, sortMode]);
 
   const advance = useCallback(() => {
     setCurrentIndex((index) => {
@@ -124,6 +120,10 @@ export function usePracticeWords({
   }, [words.length]);
 
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     Promise.resolve().then(async () => {

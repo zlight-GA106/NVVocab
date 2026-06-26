@@ -346,7 +346,7 @@ export default function Goal() {
         <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">备考 Goal</p>
         <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">学习目标</h1>
         <p className="max-w-3xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-          目标状态与投入时间同步到 study.target 表。
+          目标状态与投入时间将会自动同步到仪表板
         </p>
       </header>
 

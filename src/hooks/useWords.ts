@@ -7,6 +7,11 @@ import {
   type OfflineWordUpdate,
 } from '../lib/offlineReviewQueue';
 import {
+  clearCramMode,
+  getCramModeCutoffDate,
+  isCramModeEnabled,
+} from '../lib/cramMode';
+import {
   calculateAnkiNextState,
   type AnkiQuality,
 } from '../utils/ankiScheduler';
@@ -197,12 +202,13 @@ export function useWords(options: UseWordsOptions = {}) {
         return;
       }
 
-      const now = new Date().toISOString();
+      const now = new Date();
+      const reviewCutoff = isCramModeEnabled() ? getCramModeCutoffDate(now) : now;
       let dueWordsQuery = supabase
         .from('wordbase')
         .select('*')
         .eq('user_id', user.id)
-        .lte('next_review_at', now);
+        .lte('next_review_at', reviewCutoff.toISOString());
 
       if (bookTag !== allDueReviewBookTagValue) {
         dueWordsQuery = dueWordsQuery.eq('book_tag', bookTag);
@@ -257,6 +263,7 @@ export function useWords(options: UseWordsOptions = {}) {
       | null = null;
 
     const finishLocalReview = () => {
+      clearCramMode();
       setWords((previousWords) => previousWords.filter((queuedWord) => queuedWord.id !== word.id));
       setCurrentIndex(0);
     };

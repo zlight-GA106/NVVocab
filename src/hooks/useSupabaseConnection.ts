@@ -21,7 +21,7 @@ function getReadableError(error: unknown): string {
     }
   }
 
-  return '连接测试失败，请检查 Supabase 地址、匿名密钥与 wordbase 表权限。';
+  return '连接测试失败，请检查 Supabase 地址、Publishable key 与 wordbase 表权限。';
 }
 
 export function useSupabaseConnection() {

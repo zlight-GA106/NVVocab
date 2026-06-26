@@ -4,13 +4,27 @@ import { getSupabaseClient, type Database } from '../lib/supabase';
 type ReviewLog = Database['public']['Tables']['review_logs']['Row'];
 type WordbaseRow = Database['public']['Tables']['wordbase']['Row'];
 type StudyTargetRow = Database['study']['Tables']['target']['Row'];
-type ReviewLogTimestamp = Pick<ReviewLog, 'reviewed_at'>;
+type ReviewLogEventFields = Pick<ReviewLog, 'quality' | 'reviewed_at' | 'word_id'>;
 type TodayReviewLog = Pick<ReviewLog, 'quality' | 'word_id'>;
-type WordStatusFields = Pick<WordbaseRow, 'interval' | 'repetitions'>;
+type WordStatusFields = Pick<WordbaseRow, 'id' | 'interval' | 'repetitions'>;
+type ImportedWordFields = Pick<WordbaseRow, 'id' | 'introtime'>;
 
 export type HeatmapDay = {
   date: string;
   count: number;
+};
+
+export type DashboardReviewEvent = {
+  date: string;
+  quality: number;
+  reviewedAt: string;
+  wordId: string | null;
+};
+
+export type DashboardImportEvent = {
+  date: string;
+  introtime: string;
+  wordId: string;
 };
 
 export type WordStatusDistribution = {
@@ -23,6 +37,9 @@ type DashboardStats = {
   dailyWordTarget: number;
   dueWordsCount: number;
   heatmapValues: HeatmapDay[];
+  importEvents: DashboardImportEvent[];
+  masteredWordIds: string[];
+  reviewEvents: DashboardReviewEvent[];
   masteredCount: number;
   streakDays: number;
   todayImportedCount: number;
@@ -66,14 +83,44 @@ function getErrorMessage(error: unknown): string {
   return '看板数据加载失败。';
 }
 
-function buildHeatmapValues(logs: ReviewLogTimestamp[], startDate: Date): HeatmapDay[] {
-  const countsByDate = logs.reduce<Map<string, number>>((memo, log) => {
+function buildReviewEvents(logs: ReviewLogEventFields[]): DashboardReviewEvent[] {
+  return logs.reduce<DashboardReviewEvent[]>((events, log) => {
     if (!log.reviewed_at) {
-      return memo;
+      return events;
     }
 
-    const dateKey = toDateKey(new Date(log.reviewed_at));
-    memo.set(dateKey, (memo.get(dateKey) ?? 0) + 1);
+    return [
+      ...events,
+      {
+        date: toDateKey(new Date(log.reviewed_at)),
+        quality: log.quality,
+        reviewedAt: log.reviewed_at,
+        wordId: log.word_id,
+      },
+    ];
+  }, []);
+}
+
+function buildImportEvents(words: ImportedWordFields[]): DashboardImportEvent[] {
+  return words.reduce<DashboardImportEvent[]>((events, word) => {
+    if (!word.introtime) {
+      return events;
+    }
+
+    return [
+      ...events,
+      {
+        date: toDateKey(new Date(word.introtime)),
+        introtime: word.introtime,
+        wordId: word.id,
+      },
+    ];
+  }, []);
+}
+
+function buildHeatmapValues(logs: DashboardReviewEvent[], startDate: Date): HeatmapDay[] {
+  const countsByDate = logs.reduce<Map<string, number>>((memo, log) => {
+    memo.set(log.date, (memo.get(log.date) ?? 0) + 1);
     return memo;
   }, new Map<string, number>());
 
@@ -87,13 +134,11 @@ function buildHeatmapValues(logs: ReviewLogTimestamp[], startDate: Date): Heatma
   });
 }
 
-function calculateStreakDays(logs: ReviewLogTimestamp[], today: Date): number {
+function calculateStreakDays(logs: DashboardReviewEvent[], today: Date): number {
   const activeDates = new Set<string>();
 
   logs.forEach((log) => {
-    if (log.reviewed_at) {
-      activeDates.add(toDateKey(new Date(log.reviewed_at)));
-    }
+    activeDates.add(log.date);
   });
 
   let streak = 0;
@@ -142,11 +187,24 @@ function buildDistribution(words: WordStatusFields[]): WordStatusDistribution {
   );
 }
 
+function getMasteredWordIds(words: WordStatusFields[]): string[] {
+  return words.reduce<string[]>((ids, word) => {
+    if ((word.repetitions ?? 0) >= 3) {
+      return [...ids, word.id];
+    }
+
+    return ids;
+  }, []);
+}
+
 export function useDashboardStats() {
   const [stats, setStats] = useState<DashboardStats>({
     dailyWordTarget: 0,
     dueWordsCount: 0,
     heatmapValues: buildHeatmapValues([], getStartDate()),
+    importEvents: [],
+    masteredWordIds: [],
+    reviewEvents: [],
     masteredCount: 0,
     streakDays: 0,
     todayImportedCount: 0,
@@ -184,23 +242,23 @@ export function useDashboardStats() {
 
       const now = new Date();
       const todayStart = getTodayStart();
-      const [logsResult, wordsResult, dueWordsResult, todayImportedResult, todayReviewedResult, targetResult] = await Promise.all([
+      const [logsResult, wordsResult, importedWordsResult, dueWordsResult, todayReviewedResult, targetResult] = await Promise.all([
         supabase
           .from('review_logs')
-          .select('reviewed_at')
+          .select('reviewed_at,quality,word_id')
           .eq('user_id', user.id)
           .gte('reviewed_at', startDate.toISOString()),
-        supabase.from('wordbase').select('interval,repetitions').eq('user_id', user.id),
+        supabase.from('wordbase').select('id,interval,repetitions').eq('user_id', user.id),
+        supabase
+          .from('wordbase')
+          .select('id,introtime')
+          .eq('user_id', user.id)
+          .gte('introtime', startDate.toISOString()),
         supabase
           .from('wordbase')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .lte('next_review_at', now.toISOString()),
-        supabase
-          .from('wordbase')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .gte('introtime', todayStart.toISOString()),
         supabase
           .from('review_logs')
           .select('word_id,quality')
@@ -228,8 +286,8 @@ export function useDashboardStats() {
         throw dueWordsResult.error;
       }
 
-      if (todayImportedResult.error) {
-        throw todayImportedResult.error;
+      if (importedWordsResult.error) {
+        throw importedWordsResult.error;
       }
 
       if (todayReviewedResult.error) {
@@ -242,15 +300,20 @@ export function useDashboardStats() {
 
       const words = wordsResult.data ?? [];
       const distribution = buildDistribution(words);
+      const reviewEvents = buildReviewEvents(logsResult.data ?? []);
+      const importEvents = buildImportEvents(importedWordsResult.data ?? []);
       const latestTarget = (targetResult.data?.[0] ?? null) as Pick<StudyTargetRow, 'daily_word_target'> | null;
 
       setStats({
         dailyWordTarget: latestTarget?.daily_word_target ?? 0,
         dueWordsCount: dueWordsResult.count ?? 0,
-        heatmapValues: buildHeatmapValues(logsResult.data ?? [], startDate),
+        heatmapValues: buildHeatmapValues(reviewEvents, startDate),
+        importEvents,
+        masteredWordIds: getMasteredWordIds(words),
+        reviewEvents,
         masteredCount: distribution.mastered,
-        streakDays: calculateStreakDays(logsResult.data ?? [], now),
-        todayImportedCount: todayImportedResult.count ?? 0,
+        streakDays: calculateStreakDays(reviewEvents, now),
+        todayImportedCount: importEvents.filter((event) => event.introtime >= todayStart.toISOString()).length,
         todayReviewedCount: calculateTodayReviewedCount(todayReviewedResult.data ?? []),
         totalWords: words.length,
         wordStatusDistribution: distribution,

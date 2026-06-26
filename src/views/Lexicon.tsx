@@ -1,14 +1,19 @@
-import { useState, type ChangeEvent } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowUpDown,
   BookOpen,
   CalendarClock,
+  Check,
   Filter,
   LoaderCircle,
+  Printer,
   Tags,
   Trash2,
 } from 'lucide-react';
+import M3Dialog from '../components/M3Dialog';
+import M3Select, { type M3SelectOption } from '../components/M3Select';
+import { usePrintQueue } from '../hooks/usePrintQueue';
 import {
   allBookTagValue,
   alphabetFilters,
@@ -49,11 +54,15 @@ function formatIntroDate(value: string | null): string {
 
 function WordCard({
   isDeleting,
+  isQueued,
   onDelete,
+  onTogglePrintQueue,
   word,
 }: {
   isDeleting: boolean;
+  isQueued: boolean;
   onDelete: (word: WordItem) => void;
+  onTogglePrintQueue: (word: WordItem) => void;
   word: WordItem;
 }) {
   return (
@@ -71,6 +80,29 @@ function WordCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            aria-label={isQueued ? `从打印候选移除 ${word.words}` : `加入打印候选 ${word.words}`}
+            className="inline-flex size-8 items-center justify-center rounded-full transition-colors hover:bg-[#f3edf7] dark:hover:bg-[#2b2930]"
+            onClick={() => onTogglePrintQueue(word)}
+            style={
+              isQueued
+                ? {
+                    backgroundColor: 'rgb(var(--m3-primary-container))',
+                    color: 'rgb(var(--m3-primary))',
+                  }
+                : {
+                    color: 'rgb(var(--m3-primary))',
+                  }
+            }
+            title={isQueued ? '已加入打印候选' : '加入打印候选'}
+            type="button"
+          >
+            {isQueued ? (
+              <Check aria-hidden="true" className="size-4" strokeWidth={2.4} />
+            ) : (
+              <Printer aria-hidden="true" className="size-4" strokeWidth={2} />
+            )}
+          </button>
           <span
             className="rounded-full px-3 py-1 text-xs font-medium"
             style={{
@@ -138,28 +170,48 @@ export default function Lexicon() {
   const [alphabetFilter, setAlphabetFilter] = useState<AlphabetFilter>('all');
   const [bookTag, setBookTag] = useState(allBookTagValue);
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [wordPendingDelete, setWordPendingDelete] = useState<WordItem | null>(null);
+  const printQueue = usePrintQueue();
   const { bookTags, deletingWordId, deleteWord, errorMessage, filteredCount, loading, totalCount, words } = useLexicon({
     alphabetFilter,
     bookTag,
     sortDirection,
   });
-
-  const handleBookTagChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setBookTag(event.target.value);
-  };
+  const bookTagOptions = useMemo<M3SelectOption[]>(
+    () => [
+      { label: '所有单元', value: allBookTagValue },
+      ...bookTags.map((tag) => ({ label: tag, value: tag })),
+    ],
+    [bookTags],
+  );
 
   const toggleSortDirection = () => {
     setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
   };
 
   const handleDeleteWord = (word: WordItem) => {
-    const confirmed = window.confirm(`确定删除 ${word.words} 吗？相关复习日志也会被删除。`);
+    setWordPendingDelete(word);
+  };
 
-    if (!confirmed) {
+  const handleConfirmDelete = async () => {
+    if (!wordPendingDelete) {
       return;
     }
 
-    void deleteWord(word.id);
+    const deleted = await deleteWord(wordPendingDelete.id);
+
+    if (deleted) {
+      printQueue.remove(wordPendingDelete.id);
+      setWordPendingDelete(null);
+    }
+  };
+
+  const handleAddPageToPrintQueue = () => {
+    printQueue.addMany(words.map((word) => word.id));
+  };
+
+  const handleTogglePrintQueue = (word: WordItem) => {
+    printQueue.toggle(word.id);
   };
 
   return (
@@ -192,16 +244,31 @@ export default function Lexicon() {
                 当前词库
               </h2>
               <p className="mt-1 text-sm text-[#49454f] dark:text-[#cac4d0]">
-                共导入 {totalCount} 个单词，当前筛选命中 {filteredCount} 个。
+                共导入 {totalCount} 个单词，当前筛选命中 {filteredCount} 个，打印候选 {printQueue.count} 个。
               </p>
             </div>
           </div>
-          {loading && (
-            <div className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#79747e] dark:text-[#938f99]">
-              <LoaderCircle aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
-              <span>正在同步</span>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading || words.length === 0}
+              onClick={handleAddPageToPrintQueue}
+              style={{
+                backgroundColor: 'rgb(var(--m3-primary-container))',
+                color: 'rgb(var(--m3-primary))',
+              }}
+              type="button"
+            >
+              <Printer aria-hidden="true" className="size-4" strokeWidth={2} />
+              <span>将本页全选加入打印候选</span>
+            </button>
+            {loading && (
+              <div className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#79747e] dark:text-[#938f99]">
+                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
+                <span>正在同步</span>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -255,21 +322,7 @@ export default function Lexicon() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <label className="block">
             <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">单元分类</span>
-            <div className="relative flex h-12 items-center rounded-[16px] border border-[#79747e] bg-transparent px-4 transition-colors focus-within:border-[#6750a4] focus-within:ring-2 focus-within:ring-[#6750a4] dark:border-[#938f99]">
-              <Tags aria-hidden="true" className="mr-3 size-4 shrink-0 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
-              <select
-                className="h-full min-w-0 flex-1 bg-transparent text-sm text-[#1d1b20] outline-none dark:text-[#e6e0e9]"
-                onChange={handleBookTagChange}
-                value={bookTag}
-              >
-                <option value={allBookTagValue}>所有单元</option>
-                {bookTags.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <M3Select icon={Tags} onChange={setBookTag} options={bookTagOptions} value={bookTag} />
           </label>
 
           <button
@@ -305,8 +358,10 @@ export default function Lexicon() {
             {words.map((word) => (
               <WordCard
                 isDeleting={deletingWordId === word.id}
+                isQueued={printQueue.has(word.id)}
                 key={word.id}
                 onDelete={handleDeleteWord}
+                onTogglePrintQueue={handleTogglePrintQueue}
                 word={word}
               />
             ))}
@@ -331,6 +386,21 @@ export default function Lexicon() {
           </div>
         )}
       </section>
+
+      <M3Dialog
+        confirmLabel="确定删除"
+        description={
+          wordPendingDelete
+            ? `将删除 ${wordPendingDelete.words} 以及相关复习日志，此操作无法撤销。`
+            : undefined
+        }
+        loading={Boolean(wordPendingDelete && deletingWordId === wordPendingDelete.id)}
+        onCancel={() => setWordPendingDelete(null)}
+        onConfirm={() => void handleConfirmDelete()}
+        open={wordPendingDelete !== null}
+        title="删除词条"
+        tone="danger"
+      />
     </div>
   );
 }

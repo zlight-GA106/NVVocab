@@ -186,7 +186,7 @@ export function validateSupabaseCredentials(credentials: SupabaseCredentials): v
   }
 
   if (!hasHeaderSafeCharacters(credentials.key) || !hasSupabaseKeyCharacters(credentials.key)) {
-    throw new Error('Anon Public Key 只能包含英文字符、数字、点、下划线和短横线，请检查是否粘贴了中文注释、中文标点或多余文本。');
+    throw new Error('Supabase Publishable key 只能包含英文字符、数字、点、下划线和短横线，请检查是否粘贴了中文注释、中文标点或多余文本。');
   }
 
   try {

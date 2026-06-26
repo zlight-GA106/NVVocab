@@ -17,6 +17,7 @@ import {
   LoaderCircle,
   LogOut,
   PlusCircle,
+  Printer,
   Settings as SettingsIcon,
   Target,
   UserRound,
@@ -35,6 +36,7 @@ import ImportView from './views/Import';
 import LexiconView from './views/Lexicon';
 import OOBE from './views/OOBE';
 import OOBERegisterView from './views/OOBERegister';
+import PrintEditorView from './views/PrintEditor';
 import SettingsView from './views/Settings';
 
 type NavigationItem = {
@@ -46,6 +48,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { to: '/', label: '仪表盘', icon: LayoutGrid },
   { to: '/lexicon', label: '词库一览', icon: BookOpen },
+  { to: '/print', label: '打印编辑', icon: Printer },
   { to: '/import', label: '词库导入', icon: PlusCircle },
   { to: '/dictate', label: '沉浸默写', icon: BrainCircuit },
   { to: '/goal', label: '学习目标', icon: Target },
@@ -209,6 +212,35 @@ function ProtectedLayout() {
   );
 }
 
+function ConfiguredStandaloneLayout() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasClient = getSupabaseClient() !== null;
+
+  useEffect(() => {
+    if (!hasClient) {
+      navigate('/oobe', { replace: true });
+    }
+  }, [hasClient, navigate]);
+
+  if (!hasClient) {
+    return null;
+  }
+
+  return (
+    <div
+      className="min-h-screen text-[#1d1b20] transition-colors duration-300 dark:text-[#e6e0e9]"
+      style={{ backgroundColor: 'rgb(var(--m3-background))' }}
+    >
+      <main className="min-h-screen px-4 py-6 sm:px-6 md:p-8">
+        <div className="route-transition-page" key={`${location.pathname}${location.search}`}>
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function AuthGuard() {
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
@@ -275,11 +307,14 @@ export default function App() {
       <Routes>
         <Route path="/oobe" element={<OOBE />} />
         <Route path="/oobe/register" element={<OOBERegisterView />} />
-        <Route element={<ProtectedLayout />}>
+        <Route element={<ConfiguredStandaloneLayout />}>
           <Route path="/auth" element={<AuthView />} />
+        </Route>
+        <Route element={<ProtectedLayout />}>
           <Route element={<AuthGuard />}>
             <Route path="/" element={<DashboardView />} />
             <Route path="/lexicon" element={<LexiconView />} />
+            <Route path="/print" element={<PrintEditorView />} />
             <Route path="/import" element={<ImportView />} />
             <Route path="/dictate" element={<DictateView />} />
             <Route path="/goal" element={<GoalView />} />

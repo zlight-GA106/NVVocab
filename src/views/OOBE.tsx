@@ -150,7 +150,7 @@ export default function OOBE() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fffbff] px-4 py-6 text-[#1d1b20] dark:bg-[#141218] dark:text-[#e6e0e9] sm:px-6 lg:px-8">
+    <main className="route-transition-page min-h-screen bg-[#fffbff] px-4 py-6 text-[#1d1b20] dark:bg-[#141218] dark:text-[#e6e0e9] sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
         <section className="grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,480px)] lg:items-center">
           <div className="space-y-6 py-4">
@@ -181,7 +181,7 @@ export default function OOBE() {
               <div>
                 <h2 className="text-xl font-medium leading-7">数据库凭证</h2>
                 <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-                  使用 Supabase Project URL 与 anon public key。
+                  使用 Supabase Project URL 与 Publishable key。旧项目也可以使用 legacy anon key。
                 </p>
               </div>
             </div>
@@ -209,7 +209,7 @@ export default function OOBE() {
                 label={SUPABASE_KEY_STORAGE_KEY}
                 name="supabaseKey"
                 onChange={setKey}
-                placeholder="粘贴 anon public key"
+                placeholder="粘贴 sb_publishable 或 legacy anon key"
                 type="password"
                 value={key}
               />

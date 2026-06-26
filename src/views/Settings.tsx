@@ -51,6 +51,13 @@ type ColorBucket = {
   redTotal: number;
 };
 
+type PaletteToken = {
+  label: string;
+  name: string;
+  usage: string;
+  value: string;
+};
+
 const sampleCanvasSize = 50;
 const credentialSuccessDurationMs = 2000;
 const hueCircle = 1;
@@ -65,6 +72,54 @@ function clampColorValue(value: number): number {
 
 function toRgbString(color: RgbColor): string {
   return `${clampColorValue(color.red)} ${clampColorValue(color.green)} ${clampColorValue(color.blue)}`;
+}
+
+function parseRgbToken(value: string): RgbColor {
+  const [red = 0, green = 0, blue = 0] = value.split(' ').map((channel) => Number(channel));
+
+  return {
+    blue: clampColorValue(blue),
+    green: clampColorValue(green),
+    red: clampColorValue(red),
+  };
+}
+
+function toHexChannel(value: number): string {
+  return clampColorValue(value).toString(16).padStart(2, '0').toUpperCase();
+}
+
+function toHexToken(value: string): string {
+  const color = parseRgbToken(value);
+  return `#${toHexChannel(color.red)}${toHexChannel(color.green)}${toHexChannel(color.blue)}`;
+}
+
+function getLinearChannel(channel: number): number {
+  const normalized = clampColorValue(channel) / 255;
+  return normalized <= 0.03928
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function getRgbLuminance(value: string): number {
+  const color = parseRgbToken(value);
+
+  return (
+    0.2126 * getLinearChannel(color.red) +
+    0.7152 * getLinearChannel(color.green) +
+    0.0722 * getLinearChannel(color.blue)
+  );
+}
+
+function getReadableSwatchTextColor(value: string): string {
+  return getRgbLuminance(value) > 0.54 ? '#1d1b20' : '#ffffff';
+}
+
+function getReadableSwatchOverlayColor(value: string): string {
+  return getRgbLuminance(value) > 0.54 ? 'rgb(255 255 255 / 0.68)' : 'rgb(0 0 0 / 0.26)';
+}
+
+function getReadableSwatchBorderColor(value: string): string {
+  return getRgbLuminance(value) > 0.72 ? 'rgb(0 0 0 / 0.16)' : 'rgb(255 255 255 / 0.36)';
 }
 
 function normalizeHue(hue: number): number {
@@ -436,10 +491,10 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-              Supabase 节点维护
+              您的数据库URL和登录凭据
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-              凭证只会保存到当前设备的浏览器本地存储。
+              连接到你的Supabase。注意：凭证将被保存至本机浏览器的缓存中
             </p>
           </div>
         </div>
@@ -464,7 +519,7 @@ export default function Settings() {
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">Anon Public Key</span>
+            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">Publishable Key</span>
             <div className="flex h-12 items-center rounded-[16px] border border-[#79747e] px-4 transition-colors focus-within:border-[#6750a4] focus-within:ring-2 focus-within:ring-[#6750a4] dark:border-[#938f99]">
               <KeyRound aria-hidden="true" className="mr-3 size-4 shrink-0 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
               <input
@@ -473,7 +528,7 @@ export default function Settings() {
                 className="min-w-0 flex-1 bg-transparent text-sm text-[#1d1b20] outline-none placeholder:text-[#79747e] dark:text-[#e6e0e9] dark:placeholder:text-[#938f99]"
                 name={SUPABASE_KEY_STORAGE_KEY}
                 onChange={(event) => setAnonKey(event.target.value)}
-                placeholder="粘贴 anon public key"
+                placeholder="粘贴 sb_publishable 或 legacy anon key"
                 spellCheck={false}
                 type="password"
                 value={anonKey}
@@ -519,10 +574,10 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-              莫奈动态取色
+              动态取色
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-              上传油画或壁纸后，系统会从 50 像素采样画布中提取主色。
+              上传图片后，系统会从采样画布中自动提取主题色。
             </p>
           </div>
         </div>
@@ -560,26 +615,91 @@ export default function Settings() {
 
         {theme && (
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { label: '--m3-primary', value: theme.primary },
-              { label: '--m3-primary-container', value: theme.primaryContainer },
-              { label: '--m3-secondary', value: theme.secondary },
-              { label: '--m3-tertiary', value: theme.tertiary },
-              { label: '--m3-background', value: theme.background },
-              { label: '--m3-surface', value: theme.surface },
-            ].map((item) => (
-              <div className="rounded-[20px] bg-[#fffbff] p-4 dark:bg-[#141218]" key={item.label}>
+            {(
+              [
+                { label: '--m3-primary', name: '主色', usage: '按钮与重点操作', value: theme.primary },
+                {
+                  label: '--m3-primary-container',
+                  name: '主色容器',
+                  usage: '导航胶囊与浅色强调',
+                  value: theme.primaryContainer,
+                },
+                { label: '--m3-secondary', name: '辅助色', usage: '图表第二轴', value: theme.secondary },
+                { label: '--m3-tertiary', name: '第三色', usage: '图表第三轴', value: theme.tertiary },
+                { label: '--m3-background', name: '背景色', usage: '全局页面底色', value: theme.background },
+                { label: '--m3-surface', name: '表面色', usage: '卡片与侧边栏', value: theme.surface },
+              ] satisfies PaletteToken[]
+            ).map((item) => {
+              const swatchTextColor = getReadableSwatchTextColor(item.value);
+              const overlayColor = getReadableSwatchOverlayColor(item.value);
+
+              return (
                 <div
-                  aria-hidden="true"
-                  className="mb-3 h-10 rounded-[16px] border border-[#cac4d0] dark:border-[#49454f]"
-                  style={{ backgroundColor: `rgb(${item.value})` }}
-                />
-                <p className="text-xs text-[#79747e] dark:text-[#938f99]">{item.label}</p>
-                <p className="mt-1 break-words text-sm font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                  {item.value}
-                </p>
-              </div>
-            ))}
+                  className="rounded-[24px] border border-white/30 p-3 shadow-sm backdrop-blur-md dark:border-white/10"
+                  key={item.label}
+                  style={{ backgroundColor: 'rgb(var(--m3-surface) / 0.58)' }}
+                >
+                  <div
+                    className="flex h-24 flex-col justify-between rounded-[18px] border p-3 shadow-inner"
+                    style={{
+                      backgroundColor: `rgb(${item.value})`,
+                      borderColor: getReadableSwatchBorderColor(item.value),
+                      color: swatchTextColor,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span
+                        className="rounded-full px-2.5 py-1 text-xs font-medium"
+                        style={{
+                          backgroundColor: overlayColor,
+                          color: swatchTextColor,
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                      <span
+                        className="rounded-full px-2.5 py-1 font-mono text-[11px] font-medium"
+                        style={{
+                          backgroundColor: overlayColor,
+                          color: swatchTextColor,
+                        }}
+                      >
+                        {toHexToken(item.value)}
+                      </span>
+                    </div>
+                    <span
+                      className="w-fit rounded-full px-2.5 py-1 text-xs"
+                      style={{
+                        backgroundColor: overlayColor,
+                        color: swatchTextColor,
+                      }}
+                    >
+                      {item.usage}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    <p className="truncate font-mono text-xs font-medium text-[#49454f] dark:text-[#cac4d0]">
+                      {item.label}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                        <p className="text-[#79747e] dark:text-[#938f99]">RGB</p>
+                        <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                          {item.value}
+                        </p>
+                      </div>
+                      <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                        <p className="text-[#79747e] dark:text-[#938f99]">HEX</p>
+                        <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                          {toHexToken(item.value)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -603,9 +723,9 @@ export default function Settings() {
             <ShieldAlert aria-hidden="true" className="size-5" strokeWidth={2} />
           </div>
           <div>
-            <h2 className="text-xl font-medium text-[#410002] dark:text-[#ffdad6]">危险区域</h2>
+            <h2 className="text-xl font-medium text-[#410002] dark:text-[#ffdad6]">清空数据库</h2>
             <p className="mt-1 text-sm leading-6 text-[#410002] dark:text-[#ffdad6]">
-              此操作会清空远程学习数据、本地凭证和动态主题缓存。
+              此操作会清空远程学习数据单词库与本地凭证和动态主题缓存。
             </p>
           </div>
         </div>
@@ -617,7 +737,7 @@ export default function Settings() {
           type="button"
         >
           <Trash2 aria-hidden="true" className="size-4" strokeWidth={2} />
-          <span>注销账户并彻底清空数据</span>
+          <span>注销账户并清空数据</span>
         </button>
 
         {errorMessage && (

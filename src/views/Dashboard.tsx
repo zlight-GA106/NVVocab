@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
+  XAxis,
+  YAxis,
+  type TooltipContentProps,
 } from 'recharts';
 import {
   AlertCircle,
@@ -16,10 +24,18 @@ import {
   Flame,
   LoaderCircle,
   Target,
+  TrendingUp,
   WalletCards,
+  Zap,
 } from 'lucide-react';
-import { useDashboardStats, type HeatmapDay } from '../hooks/useDashboardStats';
+import {
+  useDashboardStats,
+  type DashboardImportEvent,
+  type DashboardReviewEvent,
+  type HeatmapDay,
+} from '../hooks/useDashboardStats';
 import { useNextReviewSchedule } from '../hooks/useNextReviewSchedule';
+import { enableCramMode } from '../lib/cramMode';
 
 type DistributionItem = {
   color: string;
@@ -35,7 +51,30 @@ type HeatmapViewOption = {
   value: HeatmapView;
 };
 
+type HeatmapGridCell = HeatmapDay | null;
+
+type MonthLabel = {
+  column: number;
+  label: string;
+};
+
+type PeriodBattlePoint = {
+  date: string;
+  failed: number;
+  imported: number;
+  label: string;
+  passed: number;
+};
+
+type RetentionTrendPoint = {
+  date: string;
+  label: string;
+  masteredTotal: number;
+  reviewLoad: number;
+};
+
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const trendWindowDays = 14;
 const heatmapViewOptions: HeatmapViewOption[] = [
   { label: '年', value: 'year' },
   { label: '月', value: 'month' },
@@ -48,6 +87,9 @@ const m3PrimaryColor = 'rgb(var(--m3-primary))';
 const m3PrimaryContainerColor = 'rgb(var(--m3-primary-container))';
 const m3SecondaryColor = 'rgb(var(--m3-secondary))';
 const m3TertiaryColor = 'rgb(var(--m3-tertiary))';
+const m3ErrorColor = 'rgb(var(--m3-error))';
+const chartGridColor = 'rgb(var(--m3-primary) / 0.13)';
+const chartAxisColor = 'rgb(var(--m3-secondary) / 0.72)';
 const surfaceStyle = {
   backgroundColor: 'rgb(var(--m3-surface) / 0.5)',
 } satisfies CSSProperties;
@@ -78,13 +120,6 @@ function readStoredReviewQuota(): ReviewQuotaInput {
 
   return normalizeReviewQuotaInput(window.localStorage.getItem(reviewQuotaStorageKey) ?? '');
 }
-
-type HeatmapGridCell = HeatmapDay | null;
-
-type MonthLabel = {
-  column: number;
-  label: string;
-};
 
 function getHeatmapCellLevel(count: number): string {
   if (count >= 10) {
@@ -320,6 +355,281 @@ function getHeatmapTitle(view: HeatmapView): string {
   return '年度复习热力图';
 }
 
+function getEventIdentity(wordId: string | null, fallback: string): string {
+  return wordId ?? fallback;
+}
+
+function buildPeriodBattleData(
+  importEvents: DashboardImportEvent[],
+  reviewEvents: DashboardReviewEvent[],
+  startDate: Date,
+  endDate: Date,
+): PeriodBattlePoint[] {
+  const range = buildRangeValues([], startDate, endDate);
+  const importedByDate = new Map<string, number>();
+  const passedByDate = new Map<string, Set<string>>();
+  const failedByDate = new Map<string, Set<string>>();
+
+  importEvents.forEach((event) => {
+    importedByDate.set(event.date, (importedByDate.get(event.date) ?? 0) + 1);
+  });
+
+  reviewEvents.forEach((event) => {
+    const targetMap = event.quality >= 3 ? passedByDate : failedByDate;
+    const eventSet = targetMap.get(event.date) ?? new Set<string>();
+    eventSet.add(getEventIdentity(event.wordId, event.reviewedAt));
+    targetMap.set(event.date, eventSet);
+  });
+
+  return range.map((day) => ({
+    date: day.date,
+    failed: failedByDate.get(day.date)?.size ?? 0,
+    imported: importedByDate.get(day.date) ?? 0,
+    label: formatCompactDateLabel(day.date),
+    passed: passedByDate.get(day.date)?.size ?? 0,
+  }));
+}
+
+function buildRetentionTrendData(
+  masteredWordIds: string[],
+  reviewEvents: DashboardReviewEvent[],
+): RetentionTrendPoint[] {
+  const today = new Date();
+  const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (trendWindowDays - 1));
+  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const range = buildRangeValues([], startDate, endDate);
+  const masteredWordSet = new Set(masteredWordIds);
+  const successfulEventsByWord = new Map<string, DashboardReviewEvent[]>();
+  const reviewLoadByDate = new Map<string, Set<string>>();
+
+  reviewEvents.forEach((event) => {
+    const eventDate = new Date(`${event.date}T00:00:00`);
+
+    if (eventDate >= startDate && eventDate <= endDate) {
+      const loadSet = reviewLoadByDate.get(event.date) ?? new Set<string>();
+      loadSet.add(getEventIdentity(event.wordId, event.reviewedAt));
+      reviewLoadByDate.set(event.date, loadSet);
+    }
+
+    if (!event.wordId || event.quality < 3 || !masteredWordSet.has(event.wordId)) {
+      return;
+    }
+
+    const existingEvents = successfulEventsByWord.get(event.wordId) ?? [];
+    successfulEventsByWord.set(event.wordId, [...existingEvents, event]);
+  });
+
+  const masteryDateByWord = new Map<string, string>();
+
+  successfulEventsByWord.forEach((events, wordId) => {
+    const orderedEvents = [...events].sort((first, second) => first.reviewedAt.localeCompare(second.reviewedAt));
+
+    if (orderedEvents.length >= 3) {
+      masteryDateByWord.set(wordId, orderedEvents[2].date);
+    }
+  });
+
+  return range.map((day) => {
+    const masteredTotal = masteredWordIds.reduce((total, wordId) => {
+      const masteryDate = masteryDateByWord.get(wordId);
+
+      if (!masteryDate || masteryDate <= day.date) {
+        return total + 1;
+      }
+
+      return total;
+    }, 0);
+
+    return {
+      date: day.date,
+      label: formatCompactDateLabel(day.date),
+      masteredTotal,
+      reviewLoad: reviewLoadByDate.get(day.date)?.size ?? 0,
+    };
+  });
+}
+
+function M3ChartTooltip({ active, label, payload }: TooltipContentProps) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-[18px] border border-white/30 px-4 py-3 text-xs shadow-lg backdrop-blur-md dark:border-white/10"
+      style={{
+        backgroundColor: 'rgb(var(--m3-surface) / 0.88)',
+      }}
+    >
+      <p className="mb-2 font-medium text-[#1d1b20] dark:text-[#e6e0e9]">{label}</p>
+      <div className="space-y-1.5">
+        {payload.map((entry) => {
+          const value = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
+          const name = String(entry.name ?? entry.dataKey ?? '指标');
+
+          return (
+            <div className="flex items-center justify-between gap-4" key={`${name}-${entry.dataKey}`}>
+              <span className="flex items-center gap-2 text-[#49454f] dark:text-[#cac4d0]">
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: entry.color ?? m3PrimaryColor }}
+                />
+                <span>{name}</span>
+              </span>
+              <span className="font-medium text-[#1d1b20] dark:text-[#e6e0e9]">{value}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function renderM3ChartTooltip(props: TooltipContentProps) {
+  return <M3ChartTooltip {...props} />;
+}
+
+function ChartLegend({ items }: { items: Array<{ color: string; label: string }> }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {items.map((item) => (
+        <span className="inline-flex items-center gap-2 text-xs text-[#49454f] dark:text-[#cac4d0]" key={item.label}>
+          <span aria-hidden="true" className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+          <span>{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function PeriodBattleChart({ data }: { data: PeriodBattlePoint[] }) {
+  return (
+    <div
+      className="flex min-h-[212px] flex-col rounded-[24px] border border-white/30 p-4 backdrop-blur-md dark:border-white/10"
+      style={innerSurfaceStyle}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium text-[#1d1b20] dark:text-[#e6e0e9]">热力图详细看板</h3>
+          <p className="mt-1 text-xs text-[#79747e] dark:text-[#938f99]">导入、通过与拼错的堆叠分布。</p>
+        </div>
+      </div>
+      <ChartLegend
+        items={[
+          { color: m3PrimaryColor, label: '新词导入' },
+          { color: m3SecondaryColor, label: '复习通过' },
+          { color: m3ErrorColor, label: '拼写错误' },
+        ]}
+      />
+      <div className="mt-3 min-h-0 flex-1">
+        <ResponsiveContainer height={142} width="100%">
+          <BarChart data={data} margin={{ bottom: 0, left: -18, right: 2, top: 6 }}>
+            <CartesianGrid stroke={chartGridColor} strokeDasharray="4 6" vertical={false} />
+            <XAxis
+              axisLine={false}
+              dataKey="label"
+              interval={data.length > 12 ? 3 : 0}
+              tick={{ fill: chartAxisColor, fontSize: 11 }}
+              tickLine={false}
+            />
+            <YAxis allowDecimals={false} axisLine={false} tick={{ fill: chartAxisColor, fontSize: 11 }} tickLine={false} />
+            <Tooltip content={renderM3ChartTooltip} cursor={{ fill: 'rgb(var(--m3-primary-container) / 0.28)' }} />
+            <Bar dataKey="imported" fill={m3PrimaryColor} name="新词导入" radius={[0, 0, 6, 6]} stackId="battle" />
+            <Bar dataKey="passed" fill={m3SecondaryColor} name="复习通过" stackId="battle" />
+            <Bar dataKey="failed" fill={m3ErrorColor} name="拼写错误" radius={[6, 6, 0, 0]} stackId="battle" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function RetentionTrendChart({ data }: { data: RetentionTrendPoint[] }) {
+  return (
+    <div
+      className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+      style={innerSurfaceStyle}
+    >
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: m3PrimaryContainerColor,
+              color: m3PrimaryColor,
+            }}
+          >
+            <TrendingUp aria-hidden="true" className="size-5" strokeWidth={2} />
+          </div>
+          <div>
+            <h3 className="text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+              记忆留存走势
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              过去 14 天掌握总量与每日复习负载。
+            </p>
+          </div>
+        </div>
+        <ChartLegend
+          items={[
+            { color: m3PrimaryColor, label: '掌握总量' },
+            { color: m3SecondaryColor, label: '复习负载' },
+          ]}
+        />
+      </div>
+      <div className="h-[260px]">
+        <ResponsiveContainer height="100%" width="100%">
+          <LineChart data={data} margin={{ bottom: 0, left: -12, right: -4, top: 8 }}>
+            <CartesianGrid stroke={chartGridColor} strokeDasharray="4 6" vertical={false} />
+            <XAxis
+              axisLine={false}
+              dataKey="label"
+              interval={1}
+              tick={{ fill: chartAxisColor, fontSize: 11 }}
+              tickLine={false}
+            />
+            <YAxis
+              allowDecimals={false}
+              axisLine={false}
+              tick={{ fill: chartAxisColor, fontSize: 11 }}
+              tickLine={false}
+              yAxisId="mastered"
+            />
+            <YAxis
+              allowDecimals={false}
+              axisLine={false}
+              orientation="right"
+              tick={{ fill: chartAxisColor, fontSize: 11 }}
+              tickLine={false}
+              yAxisId="load"
+            />
+            <Tooltip content={renderM3ChartTooltip} />
+            <Line
+              dataKey="masteredTotal"
+              dot={false}
+              name="掌握总量"
+              stroke={m3PrimaryColor}
+              strokeWidth={3}
+              type="monotone"
+              yAxisId="mastered"
+            />
+            <Line
+              dataKey="reviewLoad"
+              dot={false}
+              name="复习负载"
+              stroke={m3SecondaryColor}
+              strokeWidth={3}
+              type="monotone"
+              yAxisId="load"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const {
@@ -328,8 +638,12 @@ export default function Dashboard() {
     endDate,
     errorMessage,
     heatmapValues,
+    importEvents,
     loading,
     masteredCount,
+    masteredWordIds,
+    refresh: refreshDashboardStats,
+    reviewEvents,
     startDate,
     streakDays,
     todayImportedCount,
@@ -340,6 +654,7 @@ export default function Dashboard() {
   const nextReviewSchedule = useNextReviewSchedule();
   const [heatmapView, setHeatmapView] = useState<HeatmapView>('month');
   const [manualReviewQuota, setManualReviewQuota] = useState<ReviewQuotaInput>(() => readStoredReviewQuota());
+  const [cramActionMessage, setCramActionMessage] = useState('');
 
   useEffect(() => {
     if (manualReviewQuota === '') {
@@ -353,6 +668,24 @@ export default function Dashboard() {
   const handleManualReviewQuotaChange = (event: ChangeEvent<HTMLInputElement>) => {
     setManualReviewQuota(normalizeReviewQuotaInput(event.target.value));
   };
+
+  const handleEnableCramMode = async () => {
+    enableCramMode();
+    setCramActionMessage('提前突击已开启，进入默写页会纳入未来 12 小时词条。');
+    await Promise.all([refreshDashboardStats(), nextReviewSchedule.refresh()]);
+  };
+
+  useEffect(() => {
+    if (!cramActionMessage) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCramActionMessage('');
+    }, 2600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [cramActionMessage]);
 
   const masteryPercent = totalWords > 0 ? (masteredCount / totalWords) * 100 : 0;
   const remainingWords = Math.max(totalWords - masteredCount, 0);
@@ -369,6 +702,14 @@ export default function Dashboard() {
     () => buildRangeValues(heatmapValues, heatmapRange.startDate, heatmapRange.endDate),
     [heatmapRange.endDate, heatmapRange.startDate, heatmapValues],
   );
+  const periodBattleData = useMemo(
+    () => buildPeriodBattleData(importEvents, reviewEvents, heatmapRange.startDate, heatmapRange.endDate),
+    [heatmapRange.endDate, heatmapRange.startDate, importEvents, reviewEvents],
+  );
+  const retentionTrendData = useMemo(
+    () => buildRetentionTrendData(masteredWordIds, reviewEvents),
+    [masteredWordIds, reviewEvents],
+  );
   const reviewedDays = displayedHeatmapValues.filter((day) => day.count > 0).length;
   const totalReviews = displayedHeatmapValues.reduce((sum, day) => sum + day.count, 0);
   const dailyProgressPercent =
@@ -383,7 +724,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">备考 Dashboard</p>
+        <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">仪表板 Dashboard</p>
         <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">
           看得见的长期积累
         </h1>
@@ -457,15 +798,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="dashboard-heatmap min-h-[172px] overflow-x-auto pb-2">
-          {heatmapView === 'year' ? (
+        {heatmapView === 'year' ? (
+          <div className="dashboard-heatmap min-h-[172px] overflow-x-auto pb-2">
             <div className="min-w-[760px]">
               <YearHeatmap values={displayedHeatmapValues} />
             </div>
-          ) : (
-            <CompactHeatmap values={displayedHeatmapValues} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+            <div className="dashboard-heatmap flex min-h-[212px] items-center justify-center overflow-x-auto rounded-[24px] border border-white/30 p-4 backdrop-blur-md dark:border-white/10" style={innerSurfaceStyle}>
+              <CompactHeatmap values={displayedHeatmapValues} />
+            </div>
+            <PeriodBattleChart data={periodBattleData} />
+          </div>
+        )}
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
@@ -485,7 +831,7 @@ export default function Dashboard() {
             </div>
             <div>
               <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                长期宏观战略
+                总概览
               </h2>
               <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
                 词库状态、长期记忆占比和通关距离。
@@ -525,10 +871,7 @@ export default function Dashboard() {
                           <Cell fill={item.color} key={item.label} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        formatter={(value) => [`${value} 个词`, '数量']}
-                        labelFormatter={() => '词库状态'}
-                      />
+                      <Tooltip content={renderM3ChartTooltip} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -632,6 +975,8 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          <RetentionTrendChart data={retentionTrendData} />
         </section>
 
         <aside
@@ -650,10 +995,10 @@ export default function Dashboard() {
             </div>
             <div>
               <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                今日行动指挥部
+                指挥部
               </h2>
               <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-                用最少动作定位今天该做的事情。
+                用最少动作定位今天该做的事情
               </p>
             </div>
           </div>
@@ -684,7 +1029,7 @@ export default function Dashboard() {
                     {todayReviewedCount} / {effectiveReviewQuota}
                   </p>
                   <p className="mt-3 text-sm leading-6">
-                    {reviewQuotaReached ? '今日战术任务已达成。' : '点击进入沉浸式默写。'}
+                    {reviewQuotaReached ? '今日目标已达成。' : '点击进入沉浸式默写。'}
                   </p>
                 </div>
                 {reviewQuotaReached ? (
@@ -737,25 +1082,37 @@ export default function Dashboard() {
               className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
               style={innerSurfaceStyle}
             >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    backgroundColor: m3PrimaryContainerColor,
-                    color: m3PrimaryColor,
-                  }}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: m3PrimaryContainerColor,
+                      color: m3PrimaryColor,
+                    }}
+                  >
+                    <CalendarClock aria-hidden="true" className="size-5" strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">下一轮复习时间：</p>
+                    <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                      {nextReviewSchedule.loading ? '正在计算' : nextReviewSchedule.countdownText}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-[#79747e] dark:text-[#938f99]">
+                      {nextReviewSchedule.reviewDateText}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  aria-label="开启提前突击"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f3edf7] dark:hover:bg-[#2b2930]"
+                  onClick={() => void handleEnableCramMode()}
+                  style={{ color: m3PrimaryColor }}
+                  title="提前突击"
+                  type="button"
                 >
-                  <CalendarClock aria-hidden="true" className="size-5" strokeWidth={2} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">下一轮复习时间：</p>
-                  <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                    {nextReviewSchedule.loading ? '正在计算' : nextReviewSchedule.countdownText}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-[#79747e] dark:text-[#938f99]">
-                    {nextReviewSchedule.reviewDateText}
-                  </p>
-                </div>
+                  <Zap aria-hidden="true" className="size-5" strokeWidth={2} />
+                </button>
               </div>
               <div className="mt-4 flex items-center justify-between gap-4 rounded-[18px] px-4 py-3" style={{ backgroundColor: 'rgb(var(--m3-surface) / 0.6)' }}>
                 <span className="text-sm text-[#49454f] dark:text-[#cac4d0]">下一轮自动复习单词数</span>
@@ -763,14 +1120,19 @@ export default function Dashboard() {
                   {nextReviewSchedule.nextReviewWordCount} 词
                 </span>
               </div>
+              {cramActionMessage && (
+                <p className="mt-3 text-xs leading-5" style={{ color: m3PrimaryColor }}>
+                  {cramActionMessage}
+                </p>
+              )}
             </div>
 
-            <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
-              style={innerSurfaceStyle}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div
+                className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+                style={innerSurfaceStyle}
+              >
+                <div className="space-y-3">
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                     style={{
@@ -782,40 +1144,38 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">连续打卡</p>
-                    <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                      连续突击 {streakDays} 天
+                    <p className="mt-1 text-2xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                      {streakDays} 天
                     </p>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
-              style={innerSurfaceStyle}
-            >
-              <div className="mb-3 flex items-end justify-between gap-4">
-                <div>
+              <div
+                className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+                style={innerSurfaceStyle}
+              >
+                <div className="mb-3">
                   <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">今日新增</p>
-                  <p className="mt-1 text-2xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                  <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
                     {dailyTargetText}
                   </p>
                 </div>
                 <p className="text-sm font-medium" style={{ color: m3PrimaryColor }}>
                   {dailyWordTarget > 0 ? formatPercent(dailyProgressPercent) : '未设置'}
                 </p>
-              </div>
-              <div
-                className="h-3 overflow-hidden rounded-full"
-                style={{ backgroundColor: m3PrimaryContainerColor }}
-              >
                 <div
-                  className="dashboard-progress-bar h-full rounded-full"
-                  style={{
-                    backgroundColor: m3PrimaryColor,
-                    width: `${dailyProgressPercent}%`,
-                  }}
-                />
+                  className="mt-3 h-3 overflow-hidden rounded-full"
+                  style={{ backgroundColor: m3PrimaryContainerColor }}
+                >
+                  <div
+                    className="dashboard-progress-bar h-full rounded-full"
+                    style={{
+                      backgroundColor: m3PrimaryColor,
+                      width: `${dailyProgressPercent}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>

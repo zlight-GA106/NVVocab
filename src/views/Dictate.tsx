@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
   AlertCircle,
   ArrowUpDown,
@@ -11,6 +11,7 @@ import {
   Tags,
   Volume2,
 } from 'lucide-react';
+import M3Select, { type M3SelectOption } from '../components/M3Select';
 import { useNextReviewSchedule } from '../hooks/useNextReviewSchedule';
 import { usePracticeWords } from '../hooks/usePracticeWords';
 import {
@@ -45,6 +46,7 @@ export default function Dictate() {
   const [sortMode, setSortMode] = useState<WordQueueSort>('introtimeAsc');
   const [customLimit, setCustomLimit] = useState<number | ''>('');
   const [reviewRunConfig, setReviewRunConfig] = useState<ReviewRunConfig | null>(null);
+  const [practiceRunStarted, setPracticeRunStarted] = useState(false);
   const reviewState = useWords({
     bookTag: reviewRunConfig?.bookTag ?? selectedBookTag,
     enabled: reviewRunConfig !== null,
@@ -55,7 +57,7 @@ export default function Dictate() {
   const practiceLimit = typeof customLimit === 'number' ? customLimit : 80;
   const practiceState = usePracticeWords({
     bookTag: selectedBookTag,
-    enabled: dictateMode === 'practice',
+    enabled: false,
     limit: practiceLimit,
     sortMode,
   });
@@ -74,6 +76,17 @@ export default function Dictate() {
     dictateMode === 'review' ? reviewState.errorMessage : practiceState.errorMessage;
   const offlineMessage = dictateMode === 'review' ? reviewState.offlineMessage : '';
   const bookTags = reviewState.bookTags;
+  const bookTagOptions = useMemo<M3SelectOption[]>(
+    () => [
+      { label: '全部到期词库', value: allDueReviewBookTagValue },
+      ...bookTags.map((tag) => ({ label: tag, value: tag })),
+    ],
+    [bookTags],
+  );
+  const sortModeOptions = useMemo<M3SelectOption[]>(
+    () => sortOptions.map((option) => ({ label: option.label, value: option.value })),
+    [],
+  );
   const nextReviewSchedule = useNextReviewSchedule({
     bookTag: selectedBookTag,
     enabled: dictateMode === 'review',
@@ -100,14 +113,6 @@ export default function Dictate() {
     };
   }, [currentWord?.id, dictateMode, selectedBookTag, sortMode]);
 
-  const handleBookTagChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedBookTag(event.target.value);
-  };
-
-  const handleSortModeChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSortMode(event.target.value as WordQueueSort);
-  };
-
   const handleCustomLimitChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value.trim();
 
@@ -124,6 +129,34 @@ export default function Dictate() {
     setCustomLimit(Math.max(1, parsedValue));
   };
 
+  const handleModeChange = (nextMode: DictateMode) => {
+    if (nextMode === dictateMode) {
+      return;
+    }
+
+    startTransition(() => {
+      setDictateMode(nextMode);
+      setAnswer('');
+      setPhase('typing');
+      setIsCorrect(false);
+      setUsedHint(false);
+
+      if (nextMode === 'practice') {
+        setPracticeRunStarted(false);
+      }
+    });
+  };
+
+  const handleBookTagChange = (nextValue: string) => {
+    setSelectedBookTag(nextValue);
+    setPracticeRunStarted(false);
+  };
+
+  const handleSortModeChange = (nextValue: string) => {
+    setSortMode(nextValue as WordQueueSort);
+    setPracticeRunStarted(false);
+  };
+
   const startReviewRun = () => {
     const hasCustomLimit = typeof customLimit === 'number';
     setReviewRunConfig({
@@ -137,6 +170,7 @@ export default function Dictate() {
 
   const startDictationRun = () => {
     if (dictateMode === 'practice') {
+      setPracticeRunStarted(true);
       void practiceState.fetchPracticeWords();
       return;
     }
@@ -229,35 +263,50 @@ export default function Dictate() {
     dictateMode === 'review'
       ? '当前没有需要复习的词条。导入新词或等待下一次复习时间到期后再回来。'
       : '当前词库没有可练习的词条。请先导入词库后再进入练习模式。';
+  const waitingToStart = dictateMode === 'review' ? !reviewRunConfig : !practiceRunStarted;
+  const readyTitle = dictateMode === 'review' ? '准备开始默写' : '准备开始练习';
+  const readyDescription =
+    dictateMode === 'review'
+      ? '设置复习范围和本次数量后点击开始。数量留空时由系统自动限流并洗牌。'
+      : '设置练习范围和本次数量后点击开始。练习模式不会写入复习统计。';
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-5xl flex-col justify-center space-y-8">
       <header className="space-y-4">
         <div className="space-y-3">
           <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">
-            沉浸式键盘默写
+            沉浸式默写
           </p>
           <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">
             {dictateMode === 'review' ? '只看释义，敲出单词' : '看见单词，完成拼写练习'}
           </h1>
         </div>
 
-        <div className="flex w-fit rounded-full border border-[#79747e] p-1 dark:border-[#938f99]">
+        <div className="relative grid w-fit grid-cols-2 rounded-full border border-[#79747e] p-1 dark:border-[#938f99]">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-1 left-1 rounded-full transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)]"
+            style={{
+              backgroundColor: 'rgb(var(--m3-primary-container))',
+              transform: dictateMode === 'practice' ? 'translateX(100%)' : 'translateX(0)',
+              width: 'calc((100% - 0.5rem) / 2)',
+            }}
+          />
           {[
             { icon: PenLine, label: '复习模式', value: 'review' as const },
             { icon: Keyboard, label: '练习模式', value: 'practice' as const },
           ].map((option) => {
             const Icon = option.icon;
+            const active = dictateMode === option.value;
 
             return (
               <button
-                className={`inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors ${
-                  dictateMode === option.value
-                    ? 'bg-[#e8def8] text-[#4f378b] dark:bg-[#4a4458] dark:text-[#eaddff]'
-                    : 'text-[#49454f] hover:bg-[#f3edf7] dark:text-[#cac4d0] dark:hover:bg-[#2b2930]'
-                }`}
+                className="relative z-10 inline-flex h-10 min-w-28 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/10"
                 key={option.value}
-                onClick={() => setDictateMode(option.value)}
+                onClick={() => handleModeChange(option.value)}
+                style={{
+                  color: active ? 'rgb(var(--m3-primary))' : undefined,
+                }}
                 type="button"
               >
                 <Icon aria-hidden="true" className="size-4" strokeWidth={2} />
@@ -273,43 +322,26 @@ export default function Dictate() {
               <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">
                 复习范围
               </span>
-              <div className="flex h-12 items-center rounded-[16px] border border-[#79747e] bg-transparent px-4 transition-colors focus-within:border-[#6750a4] focus-within:ring-2 focus-within:ring-[#6750a4] dark:border-[#938f99]">
-                <Tags aria-hidden="true" className="mr-3 size-4 shrink-0 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
-                <select
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-[#1d1b20] outline-none dark:text-[#e6e0e9]"
-                  disabled={loading || submitting}
-                  onChange={handleBookTagChange}
-                  value={selectedBookTag}
-                >
-                  <option value={allDueReviewBookTagValue}>全部到期词库</option>
-                  {bookTags.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <M3Select
+                disabled={loading || submitting}
+                icon={Tags}
+                onChange={handleBookTagChange}
+                options={bookTagOptions}
+                value={selectedBookTag}
+              />
             </label>
 
             <label className="block">
               <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">
                 排序方式
               </span>
-              <div className="flex h-12 items-center rounded-[16px] border border-[#79747e] bg-transparent px-4 transition-colors focus-within:border-[#6750a4] focus-within:ring-2 focus-within:ring-[#6750a4] dark:border-[#938f99]">
-                <ArrowUpDown aria-hidden="true" className="mr-3 size-4 shrink-0 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
-                <select
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-[#1d1b20] outline-none dark:text-[#e6e0e9]"
-                  disabled={loading || submitting}
-                  onChange={handleSortModeChange}
-                  value={sortMode}
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <M3Select
+                disabled={loading || submitting}
+                icon={ArrowUpDown}
+                onChange={handleSortModeChange}
+                options={sortModeOptions}
+                value={sortMode}
+              />
             </label>
 
             <label className="block">
@@ -389,13 +421,13 @@ export default function Dictate() {
       </header>
 
       <section className="rounded-[28px] border border-[#cac4d0] bg-[#fef7ff] p-6 shadow-sm dark:border-[#49454f] dark:bg-[#211f26] sm:p-8">
-        {dictateMode === 'review' && !reviewRunConfig ? (
+        {waitingToStart ? (
           <div className="flex min-h-[320px] flex-col items-center justify-center space-y-3 text-center">
             <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-              准备开始默写
+              {readyTitle}
             </h2>
             <p className="max-w-md text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-              设置复习范围和本次数量后点击开始。数量留空时由系统自动限流并洗牌。
+              {readyDescription}
             </p>
           </div>
         ) : loading ? (

@@ -67,7 +67,7 @@ export default function OOBERegister() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fffbff] px-4 py-6 text-[#1d1b20] dark:bg-[#141218] dark:text-[#e6e0e9] sm:px-6 lg:px-8">
+    <main className="route-transition-page min-h-screen bg-[#fffbff] px-4 py-6 text-[#1d1b20] dark:bg-[#141218] dark:text-[#e6e0e9] sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
         <section className="grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,460px)] lg:items-center">
           <div className="space-y-6 py-4">
@@ -76,13 +76,13 @@ export default function OOBERegister() {
             </div>
             <div className="max-w-2xl space-y-4">
               <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">
-                首航引导第一步
+                第一步
               </p>
               <h1 className="text-4xl font-normal leading-tight sm:text-5xl">
                 创建管理员账号
               </h1>
               <p className="max-w-xl text-base leading-7 text-[#49454f] dark:text-[#cac4d0]">
-                词库导入和复习日志都需要绑定当前登录用户。先完成注册并建立本地 Session，后续写入会自动携带 Supabase JWT，通过 RLS 策略校验。
+                登入你的单词速记，请妥善保管您的超管账号。
               </p>
             </div>
           </div>

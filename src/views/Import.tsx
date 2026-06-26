@@ -71,10 +71,10 @@ export default function Import() {
     <div className="space-y-6">
       <header>
         <h1 className="mb-2 text-2xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">
-          词库自增导入
+          词库导入
         </h1>
         <p className="max-w-3xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-          按章节粘贴教辅书文本，系统会实时拆分单词、音标与释义。
+          按章节键入文本，系统会实时拆分单词、音标与释义。
         </p>
       </header>
 
