@@ -11,6 +11,7 @@ import {
   Tags,
   Volume2,
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import M3Select, { type M3SelectOption } from '../components/M3Select';
 import { useNextReviewSchedule } from '../hooks/useNextReviewSchedule';
 import { usePracticeWords } from '../hooks/usePracticeWords';
@@ -34,18 +35,58 @@ type ReviewRunConfig = {
 
 const systemManagedReviewLimit = 100;
 const sortOptions: Array<{ label: string; value: WordQueueSort }> = [
+  { label: '根据熟练度自动排序', value: 'adaptive' },
   { label: '最早导入优先', value: 'introtimeAsc' },
   { label: '最近导入优先', value: 'introtimeDesc' },
   { label: '随机乱序', value: 'random' },
 ];
 
+type RouteBasketConfig = {
+  autostart: boolean;
+  bookTag: string;
+  sortMode: WordQueueSort;
+};
+
+function isWordQueueSort(value: string | null): value is WordQueueSort {
+  return value === 'adaptive' || value === 'introtimeAsc' || value === 'introtimeDesc' || value === 'random';
+}
+
+function readRouteBasketConfig(search: string): RouteBasketConfig | null {
+  const params = new URLSearchParams(search);
+  const sortModeParam = params.get('sort');
+
+  if (!isWordQueueSort(sortModeParam)) {
+    return null;
+  }
+
+  return {
+    autostart: params.get('autostart') === '1',
+    bookTag: params.get('bookTag') || allDueReviewBookTagValue,
+    sortMode: sortModeParam,
+  };
+}
+
 export default function Dictate() {
+  const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [initialRouteConfig] = useState<RouteBasketConfig | null>(() => readRouteBasketConfig(location.search));
   const [dictateMode, setDictateMode] = useState<DictateMode>('review');
-  const [selectedBookTag, setSelectedBookTag] = useState(allDueReviewBookTagValue);
-  const [sortMode, setSortMode] = useState<WordQueueSort>('introtimeAsc');
+  const [selectedBookTag, setSelectedBookTag] = useState(initialRouteConfig?.bookTag ?? allDueReviewBookTagValue);
+  const [sortMode, setSortMode] = useState<WordQueueSort>(initialRouteConfig?.sortMode ?? 'adaptive');
   const [customLimit, setCustomLimit] = useState<number | ''>('');
-  const [reviewRunConfig, setReviewRunConfig] = useState<ReviewRunConfig | null>(null);
+  const [reviewRunConfig, setReviewRunConfig] = useState<ReviewRunConfig | null>(() => {
+    if (!initialRouteConfig?.autostart) {
+      return null;
+    }
+
+    return {
+      bookTag: initialRouteConfig.bookTag,
+      limit: systemManagedReviewLimit,
+      reloadKey: Date.now(),
+      sortMode: initialRouteConfig.sortMode,
+      systemManaged: true,
+    };
+  });
   const [practiceRunStarted, setPracticeRunStarted] = useState(false);
   const reviewState = useWords({
     bookTag: reviewRunConfig?.bookTag ?? selectedBookTag,
@@ -68,13 +109,18 @@ export default function Dictate() {
 
   const currentWord =
     dictateMode === 'review' ? reviewState.currentWord : practiceState.currentWord;
-  const loading = dictateMode === 'review' ? reviewState.loading : practiceState.loading;
+  const reviewRunHydrating =
+    dictateMode === 'review' &&
+    reviewRunConfig !== null &&
+    reviewState.loadedReloadKey !== reviewRunConfig.reloadKey;
+  const loading = dictateMode === 'review' ? reviewState.loading || reviewRunHydrating : practiceState.loading;
   const queueLength =
     dictateMode === 'review' ? reviewState.queueLength : practiceState.queueLength;
   const submitting = dictateMode === 'review' ? reviewState.submitting : false;
   const errorMessage =
     dictateMode === 'review' ? reviewState.errorMessage : practiceState.errorMessage;
   const offlineMessage = dictateMode === 'review' ? reviewState.offlineMessage : '';
+  const practiceCompleted = dictateMode === 'practice' && practiceState.completed;
   const bookTags = reviewState.bookTags;
   const bookTagOptions = useMemo<M3SelectOption[]>(
     () => [
@@ -163,7 +209,7 @@ export default function Dictate() {
       bookTag: selectedBookTag,
       limit: hasCustomLimit ? customLimit : systemManagedReviewLimit,
       reloadKey: Date.now(),
-      sortMode: hasCustomLimit ? sortMode : 'random',
+      sortMode: hasCustomLimit ? sortMode : 'adaptive',
       systemManaged: !hasCustomLimit,
     });
   };
@@ -258,11 +304,18 @@ export default function Dictate() {
         ? 'border-[#146c2e] focus-within:ring-[#146c2e] dark:border-[#7ddc82]'
         : 'border-[#ba1a1a] focus-within:ring-[#ba1a1a] dark:border-[#ffb4ab]';
 
-  const emptyTitle = dictateMode === 'review' ? '暂无到期单词' : '暂无练习词条';
+  const emptyTitle =
+    dictateMode === 'review'
+      ? '暂无到期单词'
+      : practiceCompleted
+        ? '本轮练习完成'
+        : '暂无练习词条';
   const emptyDescription =
     dictateMode === 'review'
       ? '当前没有需要复习的词条。导入新词或等待下一次复习时间到期后再回来。'
-      : '当前词库没有可练习的词条。请先导入词库后再进入练习模式。';
+      : practiceCompleted
+        ? '当前练习列表已经结束。可以重新开始，或调整范围和排序后再练习。'
+        : '当前词库没有可练习的词条。请先导入词库后再进入练习模式。';
   const waitingToStart = dictateMode === 'review' ? !reviewRunConfig : !practiceRunStarted;
   const readyTitle = dictateMode === 'review' ? '准备开始默写' : '准备开始练习';
   const readyDescription =
@@ -384,10 +437,10 @@ export default function Dictate() {
             <>
               <p className="mt-3 text-xs leading-5 text-[#79747e] dark:text-[#938f99]">
                 {reviewRunConfig?.systemManaged
-                  ? `系统托管本轮最多 ${systemManagedReviewLimit} 词，并自动随机洗牌。`
+                  ? `系统托管本轮最多 ${systemManagedReviewLimit} 词，并按熟练度自动编排。`
                   : reviewRunConfig
                     ? `本轮按手动数量读取 ${reviewRunConfig.limit} 词。`
-                    : `留空时系统最多读取 ${systemManagedReviewLimit} 个到期词并随机洗牌。`}
+                    : `留空时系统最多读取 ${systemManagedReviewLimit} 个到期词并按熟练度自动编排。`}
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <div

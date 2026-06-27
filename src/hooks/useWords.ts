@@ -15,6 +15,7 @@ import {
   calculateAnkiNextState,
   type AnkiQuality,
 } from '../utils/ankiScheduler';
+import { compareByAdaptiveProficiency } from '../utils/proficiencyRating';
 
 export type ReviewWord = Database['public']['Tables']['wordbase']['Row'];
 
@@ -45,7 +46,7 @@ type UseWordsOptions = {
   sortMode?: WordQueueSort;
 };
 
-export type WordQueueSort = 'introtimeAsc' | 'introtimeDesc' | 'random';
+export type WordQueueSort = 'adaptive' | 'introtimeAsc' | 'introtimeDesc' | 'random';
 
 export const allDueReviewBookTagValue = '__all_due_review_words__';
 
@@ -148,6 +149,11 @@ function shuffleWords(words: ReviewWord[]): ReviewWord[] {
   return shuffledWords;
 }
 
+function sortAdaptiveWords(words: ReviewWord[], limit: number): ReviewWord[] {
+  const now = new Date();
+  return [...words].sort((first, second) => compareByAdaptiveProficiency(first, second, now)).slice(0, limit);
+}
+
 export function useWords(options: UseWordsOptions = {}) {
   const bookTag = options.bookTag ?? allDueReviewBookTagValue;
   const enabled = options.enabled ?? true;
@@ -159,6 +165,7 @@ export function useWords(options: UseWordsOptions = {}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(() => enabled && getSupabaseClient() !== null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [loadedReloadKey, setLoadedReloadKey] = useState<number | null>(enabled ? null : reloadKey);
   const [offlineMessage, setOfflineMessage] = useState('');
   const [offlineQueueCount, setOfflineQueueCount] = useState(() => getOfflineReviewQueueCount());
   const [submitting, setSubmitting] = useState(false);
@@ -172,6 +179,7 @@ export function useWords(options: UseWordsOptions = {}) {
       setErrorMessage('尚未配置数据库连接。');
       setLoading(false);
       setWords([]);
+      setLoadedReloadKey(reloadKey);
       return;
     }
 
@@ -199,6 +207,7 @@ export function useWords(options: UseWordsOptions = {}) {
       if (!enabled) {
         setWords([]);
         setCurrentIndex(0);
+        setLoadedReloadKey(reloadKey);
         return;
       }
 
@@ -214,6 +223,13 @@ export function useWords(options: UseWordsOptions = {}) {
         dueWordsQuery = dueWordsQuery.eq('book_tag', bookTag);
       }
 
+      if (sortMode === 'adaptive') {
+        dueWordsQuery = dueWordsQuery
+          .order('repetitions', { ascending: true })
+          .order('wrong_count', { ascending: false })
+          .order('next_review_at', { ascending: true });
+      }
+
       if (sortMode === 'introtimeAsc') {
         dueWordsQuery = dueWordsQuery.order('introtime', { ascending: true });
       }
@@ -222,7 +238,8 @@ export function useWords(options: UseWordsOptions = {}) {
         dueWordsQuery = dueWordsQuery.order('introtime', { ascending: false });
       }
 
-      const dueWordsResult = await dueWordsQuery.limit(limit);
+      const queryLimit = sortMode === 'adaptive' ? Math.min(500, Math.max(limit * 4, limit)) : limit;
+      const dueWordsResult = await dueWordsQuery.limit(queryLimit);
 
       const { data, error } = dueWordsResult;
 
@@ -230,16 +247,25 @@ export function useWords(options: UseWordsOptions = {}) {
         throw error;
       }
 
-      setWords(sortMode === 'random' ? shuffleWords(data ?? []) : (data ?? []));
+      const loadedWords = data ?? [];
+      const nextWords =
+        sortMode === 'random'
+          ? shuffleWords(loadedWords)
+          : sortMode === 'adaptive'
+            ? sortAdaptiveWords(loadedWords, limit)
+            : loadedWords;
+
+      setWords(nextWords);
       setCurrentIndex(0);
     } catch (error: unknown) {
       setWords([]);
       setCurrentIndex(0);
       setErrorMessage(getErrorMessage(error));
     } finally {
+      setLoadedReloadKey(reloadKey);
       setLoading(false);
     }
-  }, [bookTag, enabled, limit, sortMode]);
+  }, [bookTag, enabled, limit, reloadKey, sortMode]);
 
   const submitReview = useCallback(async (word: ReviewWord, result: ReviewResult) => {
     const supabase = getSupabaseClient();
@@ -263,8 +289,15 @@ export function useWords(options: UseWordsOptions = {}) {
       | null = null;
 
     const finishLocalReview = () => {
-      clearCramMode();
-      setWords((previousWords) => previousWords.filter((queuedWord) => queuedWord.id !== word.id));
+      setWords((previousWords) => {
+        const nextWords = previousWords.filter((queuedWord) => queuedWord.id !== word.id);
+
+        if (nextWords.length === 0) {
+          clearCramMode();
+        }
+
+        return nextWords;
+      });
       setCurrentIndex(0);
     };
 
@@ -373,6 +406,7 @@ export function useWords(options: UseWordsOptions = {}) {
     fetchDueWords,
     isSpellingCorrect,
     loading,
+    loadedReloadKey,
     offlineMessage,
     offlineQueueCount,
     queueLength: words.length,

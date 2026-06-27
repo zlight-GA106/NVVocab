@@ -6,6 +6,8 @@ import {
   CalendarClock,
   Check,
   Filter,
+  Gauge,
+  ListOrdered,
   LoaderCircle,
   Printer,
   Tags,
@@ -20,9 +22,14 @@ import {
   alphabetFilters,
   useLexicon,
   type AlphabetFilter,
-  type SortDirection,
+  type LexiconSortMode,
   type WordItem,
 } from '../hooks/useLexicon';
+import {
+  compareByAdaptiveProficiency,
+  getWordProficiency,
+  type ProficiencyBand,
+} from '../utils/proficiencyRating';
 
 const surfaceStyle = {
   backgroundColor: 'rgb(var(--m3-surface) / 0.4)',
@@ -32,8 +39,21 @@ const strongSurfaceStyle = {
   backgroundColor: 'rgb(var(--m3-surface) / 0.58)',
 } satisfies React.CSSProperties;
 
+const deleteAnimationDurationMs = 260;
+
+const sortModeOptions: M3SelectOption[] = [
+  { label: '最近导入优先', value: 'introtimeDesc' },
+  { label: '最早导入优先', value: 'introtimeAsc' },
+  { label: '熟练度低优先', value: 'proficiencyAsc' },
+  { label: '熟练度高优先', value: 'proficiencyDesc' },
+];
+
 function getAlphabetLabel(value: AlphabetFilter): string {
   return value === 'all' ? '全部' : value;
+}
+
+function isLexiconSortMode(value: string): value is LexiconSortMode {
+  return value === 'introtimeAsc' || value === 'introtimeDesc' || value === 'proficiencyAsc' || value === 'proficiencyDesc';
 }
 
 function formatIntroDate(value: string | null): string {
@@ -53,6 +73,26 @@ function formatIntroDate(value: string | null): string {
   });
 }
 
+function getProficiencyBadgeStyle(band: ProficiencyBand): React.CSSProperties {
+  if (band === 'fragile') {
+    return {
+      backgroundColor: 'rgb(var(--m3-error-container, 255 218 214))',
+      color: 'rgb(var(--m3-error, 186 26 26))',
+    };
+  }
+
+  return {
+    backgroundColor: 'rgb(var(--m3-primary-container))',
+    color: 'rgb(var(--m3-primary))',
+  };
+}
+
+function getProficiencyBarStyle(band: ProficiencyBand): React.CSSProperties {
+  return {
+    backgroundColor: band === 'fragile' ? 'rgb(var(--m3-error, 186 26 26))' : 'rgb(var(--m3-primary))',
+  };
+}
+
 function WordCard({
   isDeleting,
   isQueued,
@@ -68,9 +108,13 @@ function WordCard({
   onTogglePrintQueue: (word: WordItem) => void;
   word: WordItem;
 }) {
+  const proficiency = getWordProficiency(word);
+
   return (
     <article
-      className="rounded-2xl border border-white/30 p-4 shadow-sm backdrop-blur-md transition-colors dark:border-white/10"
+      className={`rounded-2xl border border-white/30 p-4 shadow-sm backdrop-blur-md transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] dark:border-white/10 ${
+        isDeleting ? 'pointer-events-none -translate-y-2 scale-[0.98] opacity-0 blur-[1px]' : 'translate-y-0 scale-100 opacity-100'
+      }`}
       style={strongSurfaceStyle}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -146,6 +190,38 @@ function WordCard({
         {word.translate}
       </p>
 
+      <div className="mt-4 rounded-[18px] border border-white/30 p-3 dark:border-white/10">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Gauge aria-hidden="true" className="size-4 shrink-0 text-[#79747e] dark:text-[#938f99]" strokeWidth={2} />
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[#1d1b20] dark:text-[#e6e0e9]">熟练度评级</p>
+              <p className="mt-0.5 truncate text-xs text-[#79747e] dark:text-[#938f99]">
+                {proficiency.description}
+              </p>
+            </div>
+          </div>
+          <span
+            className="rounded-full px-3 py-1 text-xs font-medium"
+            style={getProficiencyBadgeStyle(proficiency.band)}
+          >
+            {proficiency.label} {proficiency.score}
+          </span>
+        </div>
+        <div
+          className="mt-3 h-2 overflow-hidden rounded-full"
+          style={{ backgroundColor: 'rgb(var(--m3-primary-container) / 0.45)' }}
+        >
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              ...getProficiencyBarStyle(proficiency.band),
+              width: `${proficiency.score}%`,
+            }}
+          />
+        </div>
+      </div>
+
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[#79747e] dark:text-[#938f99]">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 px-3 py-1 dark:border-white/10">
           <CalendarClock aria-hidden="true" className="size-3.5" strokeWidth={2} />
@@ -182,13 +258,14 @@ function SkeletonGrid() {
 export default function Lexicon() {
   const [alphabetFilter, setAlphabetFilter] = useState<AlphabetFilter>('all');
   const [bookTag, setBookTag] = useState(allBookTagValue);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortMode, setSortMode] = useState<LexiconSortMode>('introtimeDesc');
   const [wordPendingDelete, setWordPendingDelete] = useState<WordItem | null>(null);
+  const [wordAnimatingDeleteId, setWordAnimatingDeleteId] = useState<string | null>(null);
   const printQueue = usePrintQueue();
   const { bookTags, deletingWordId, deleteWord, errorMessage, filteredCount, loading, totalCount, words } = useLexicon({
     alphabetFilter,
     bookTag,
-    sortDirection,
+    sortMode,
   });
   const bookTagOptions = useMemo<M3SelectOption[]>(
     () => [
@@ -198,8 +275,10 @@ export default function Lexicon() {
     [bookTags],
   );
 
-  const toggleSortDirection = () => {
-    setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+  const handleSortModeChange = (nextSortMode: string) => {
+    if (isLexiconSortMode(nextSortMode)) {
+      setSortMode(nextSortMode);
+    }
   };
 
   const handleDeleteWord = (word: WordItem) => {
@@ -207,20 +286,38 @@ export default function Lexicon() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!wordPendingDelete) {
+    const targetWord = wordPendingDelete;
+
+    if (!targetWord) {
       return;
     }
 
-    const deleted = await deleteWord(wordPendingDelete.id);
+    setWordPendingDelete(null);
+    setWordAnimatingDeleteId(targetWord.id);
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, deleteAnimationDurationMs);
+    });
+
+    const deleted = await deleteWord(targetWord.id);
 
     if (deleted) {
-      printQueue.remove(wordPendingDelete.id);
-      setWordPendingDelete(null);
+      printQueue.remove(targetWord.id);
     }
+
+    setWordAnimatingDeleteId(null);
   };
 
   const handleAddPageToPrintQueue = () => {
     printQueue.addMany(words.map((word) => word.id));
+  };
+
+  const handleArrangePrintQueueByProficiency = () => {
+    const now = new Date();
+    const arrangedWordIds = [...words]
+      .sort((first, second) => compareByAdaptiveProficiency(first, second, now))
+      .map((word) => word.id);
+
+    printQueue.replace(arrangedWordIds);
   };
 
   const handleTogglePrintQueue = (word: WordItem) => {
@@ -287,6 +384,19 @@ export default function Lexicon() {
               <Printer aria-hidden="true" className="size-4" strokeWidth={2} />
               <span>将本页全选加入打印候选</span>
             </button>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading || words.length === 0}
+              onClick={handleArrangePrintQueueByProficiency}
+              style={{
+                backgroundColor: 'rgb(var(--m3-primary-container))',
+                color: 'rgb(var(--m3-primary))',
+              }}
+              type="button"
+            >
+              <ListOrdered aria-hidden="true" className="size-4" strokeWidth={2} />
+              <span>按熟练度编排打印候选</span>
+            </button>
             {loading && (
               <div className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#79747e] dark:text-[#938f99]">
                 <LoaderCircle aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
@@ -313,7 +423,7 @@ export default function Lexicon() {
           </div>
           <div>
             <h2 className="text-lg font-medium text-[#1d1b20] dark:text-[#e6e0e9]">索引控制</h2>
-            <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">三种条件会实时联动。</p>
+            <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">首字母、单元、排序和打印候选会实时联动。</p>
           </div>
         </div>
 
@@ -344,24 +454,21 @@ export default function Lexicon() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-end">
           <label className="block">
             <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">单元分类</span>
             <M3Select icon={Tags} onChange={setBookTag} options={bookTagOptions} value={bookTag} />
           </label>
 
-          <button
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium shadow-sm transition-colors"
-            onClick={toggleSortDirection}
-            style={{
-              backgroundColor: 'rgb(var(--m3-primary-container))',
-              color: 'rgb(var(--m3-primary))',
-            }}
-            type="button"
-          >
-            <ArrowUpDown aria-hidden="true" className="size-4" strokeWidth={2} />
-            <span>{sortDirection === 'asc' ? '最早导入优先' : '最近导入优先'}</span>
-          </button>
+          <label className="block">
+            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">排序方式</span>
+            <M3Select
+              icon={ArrowUpDown}
+              onChange={handleSortModeChange}
+              options={sortModeOptions}
+              value={sortMode}
+            />
+          </label>
         </div>
       </section>
 
@@ -382,7 +489,7 @@ export default function Lexicon() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {words.map((word) => (
               <WordCard
-                isDeleting={deletingWordId === word.id}
+                isDeleting={deletingWordId === word.id || wordAnimatingDeleteId === word.id}
                 isQueued={printQueue.has(word.id)}
                 key={word.id}
                 onDelete={handleDeleteWord}

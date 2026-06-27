@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSupabaseClient, type Database } from '../lib/supabase';
 import { allDueReviewBookTagValue, type WordQueueSort } from './useWords';
+import { compareByAdaptiveProficiency } from '../utils/proficiencyRating';
 
 export type PracticeWord = Database['public']['Tables']['wordbase']['Row'];
 
@@ -39,6 +40,11 @@ function shuffleWords(words: PracticeWord[]): PracticeWord[] {
   return shuffledWords;
 }
 
+function sortAdaptiveWords(words: PracticeWord[], limit: number): PracticeWord[] {
+  const now = new Date();
+  return [...words].sort((first, second) => compareByAdaptiveProficiency(first, second, now)).slice(0, limit);
+}
+
 export function usePracticeWords({
   bookTag = allDueReviewBookTagValue,
   enabled,
@@ -51,6 +57,8 @@ export function usePracticeWords({
   const [errorMessage, setErrorMessage] = useState('');
 
   const currentWord = useMemo(() => words[currentIndex] ?? null, [currentIndex, words]);
+  const completed = words.length > 0 && currentIndex >= words.length;
+  const remainingCount = Math.max(words.length - currentIndex, 0);
 
   const fetchPracticeWords = useCallback(async () => {
     const supabase = getSupabaseClient();
@@ -84,6 +92,13 @@ export function usePracticeWords({
         practiceWordsQuery = practiceWordsQuery.eq('book_tag', bookTag);
       }
 
+      if (sortMode === 'adaptive') {
+        practiceWordsQuery = practiceWordsQuery
+          .order('repetitions', { ascending: true })
+          .order('wrong_count', { ascending: false })
+          .order('next_review_at', { ascending: true });
+      }
+
       if (sortMode === 'introtimeAsc') {
         practiceWordsQuery = practiceWordsQuery.order('introtime', { ascending: true });
       }
@@ -92,13 +107,22 @@ export function usePracticeWords({
         practiceWordsQuery = practiceWordsQuery.order('introtime', { ascending: false });
       }
 
-      const { data, error } = await practiceWordsQuery.limit(limit);
+      const queryLimit = sortMode === 'adaptive' ? Math.min(500, Math.max(limit * 4, limit)) : limit;
+      const { data, error } = await practiceWordsQuery.limit(queryLimit);
 
       if (error) {
         throw error;
       }
 
-      setWords(sortMode === 'random' ? shuffleWords(data ?? []) : (data ?? []));
+      const loadedWords = data ?? [];
+      const nextWords =
+        sortMode === 'random'
+          ? shuffleWords(loadedWords)
+          : sortMode === 'adaptive'
+            ? sortAdaptiveWords(loadedWords, limit)
+            : loadedWords;
+
+      setWords(nextWords);
       setCurrentIndex(0);
     } catch (error: unknown) {
       setWords([]);
@@ -115,7 +139,7 @@ export function usePracticeWords({
         return 0;
       }
 
-      return (index + 1) % words.length;
+      return Math.min(index + 1, words.length);
     });
   }, [words.length]);
 
@@ -135,14 +159,15 @@ export function usePracticeWords({
     return () => {
       cancelled = true;
     };
-  }, [fetchPracticeWords]);
+  }, [enabled, fetchPracticeWords]);
 
   return {
     advance,
+    completed,
     currentWord,
     errorMessage,
     fetchPracticeWords,
     loading,
-    queueLength: words.length,
+    queueLength: remainingCount,
   };
 }

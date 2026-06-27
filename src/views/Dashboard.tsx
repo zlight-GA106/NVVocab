@@ -679,7 +679,7 @@ export default function Dashboard() {
 
   const handleEnableCramMode = async () => {
     triggerSubtleHapticFeedback();
-    enableCramMode();
+    enableCramMode(nextReviewSchedule.nextReviewAt);
     setShowCramNotification(true);
     setIsCramNotificationLeaving(false);
     void Promise.all([refreshDashboardStats(), nextReviewSchedule.refresh()]);
@@ -1178,7 +1178,7 @@ export default function Dashboard() {
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-neutral-900 dark:text-neutral-100">提前突击已开启</span>
                   <span className="mt-1 block text-neutral-500 dark:text-neutral-400">
-                    进入默写页会纳入未来 12 小时词条。点击此通知可关闭。
+                    进入默写页会纳入下一轮复习批次。点击此通知可关闭。
                   </span>
                 </span>
                 <X

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabaseClient, type Database } from '../lib/supabase';
+import { getWordProficiency } from '../utils/proficiencyRating';
 
 export type AlphabetFilter = 'all' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z';
 
-export type SortDirection = 'asc' | 'desc';
+export type LexiconSortMode = 'introtimeAsc' | 'introtimeDesc' | 'proficiencyAsc' | 'proficiencyDesc';
 
 export interface WordItem {
   book_tag: string | null;
@@ -24,7 +25,7 @@ type WordbaseRow = Database['public']['Tables']['wordbase']['Row'];
 type UseLexiconOptions = {
   alphabetFilter: AlphabetFilter;
   bookTag: string;
-  sortDirection: SortDirection;
+  sortMode: LexiconSortMode;
 };
 
 type LexiconState = {
@@ -117,7 +118,28 @@ function extractBookTags(rows: Pick<WordbaseRow, 'book_tag'>[]): string[] {
   return Array.from(tags).sort((first, second) => first.localeCompare(second, 'zh-CN'));
 }
 
-export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexiconOptions): LexiconState {
+function sortWordsByProficiency(words: WordItem[], sortMode: LexiconSortMode): WordItem[] {
+  if (sortMode !== 'proficiencyAsc' && sortMode !== 'proficiencyDesc') {
+    return words;
+  }
+
+  const now = new Date();
+  const direction = sortMode === 'proficiencyAsc' ? 1 : -1;
+
+  return [...words].sort((first, second) => {
+    const firstRating = getWordProficiency(first, now);
+    const secondRating = getWordProficiency(second, now);
+    const scoreDelta = (firstRating.score - secondRating.score) * direction;
+
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+
+    return secondRating.priority - firstRating.priority;
+  });
+}
+
+export function useLexicon({ alphabetFilter, bookTag, sortMode }: UseLexiconOptions): LexiconState {
   const [state, setState] = useState<LexiconDataState>({
     bookTags: [],
     errorMessage: '',
@@ -128,7 +150,7 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
   });
   const [deletingWordId, setDeletingWordId] = useState<string | null>(null);
 
-  const loadLexicon = useCallback(async () => {
+  const loadLexicon = useCallback(async (showLoading = true) => {
     const supabase = getSupabaseClient();
 
     if (!supabase) {
@@ -143,7 +165,7 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
     setState((current) => ({
       ...current,
       errorMessage: '',
-      loading: true,
+      loading: showLoading ? true : current.loading,
     }));
 
     try {
@@ -175,7 +197,7 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
       const [totalResult, tagResult, wordResult] = await Promise.all([
         supabase.from('wordbase').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('wordbase').select('book_tag').eq('user_id', user.id),
-        wordsQuery.order('introtime', { ascending: sortDirection === 'asc' }),
+        wordsQuery.order('introtime', { ascending: sortMode === 'introtimeAsc' }),
       ]);
 
       if (totalResult.error) {
@@ -190,13 +212,15 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
         throw wordResult.error;
       }
 
+      const normalizedWords = (wordResult.data ?? []).map(normalizeWord);
+
       setState({
         bookTags: extractBookTags(tagResult.data ?? []),
         errorMessage: '',
         filteredCount: wordResult.count ?? wordResult.data?.length ?? 0,
         loading: false,
         totalCount: totalResult.count ?? 0,
-        words: (wordResult.data ?? []).map(normalizeWord),
+        words: sortWordsByProficiency(normalizedWords, sortMode),
       });
     } catch (error: unknown) {
       setState((current) => ({
@@ -205,7 +229,7 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
         loading: false,
       }));
     }
-  }, [alphabetFilter, bookTag, sortDirection]);
+  }, [alphabetFilter, bookTag, sortMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,7 +293,7 @@ export function useLexicon({ alphabetFilter, bookTag, sortDirection }: UseLexico
           throw wordError;
         }
 
-        await loadLexicon();
+        await loadLexicon(false);
         return true;
       } catch (error: unknown) {
         setState((current) => ({
