@@ -13,8 +13,8 @@ import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import { useAuthActions } from './hooks/useAuthActions';
 import { useOfflineReviewSync } from './hooks/useOfflineReviewSync';
-import { restoreMaterialTheme } from './lib/materialTheme';
 import { getSupabaseClient } from './lib/supabase';
+import { resolveRuntimeConfig } from './utils/config';
 import AboutView from './views/About';
 import AuthView from './views/Auth';
 import DashboardView from './views/Dashboard';
@@ -34,7 +34,7 @@ function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="flex min-h-screen text-[#1d1b20] transition-colors duration-300 dark:text-[#e6e0e9]"
+      className="flex min-h-screen text-neutral-900 transition-colors duration-300 dark:text-neutral-100"
       style={{ backgroundColor: 'rgb(var(--m3-background))' }}
     >
       <Sidebar
@@ -57,13 +57,14 @@ function AppLayout({ children }: { children: ReactNode }) {
 
 function ProtectedLayout() {
   const navigate = useNavigate();
-  const hasClient = getSupabaseClient() !== null;
+  const shouldShowOOBE = resolveRuntimeConfig().shouldShowOOBE;
+  const hasClient = !shouldShowOOBE && getSupabaseClient() !== null;
 
   useEffect(() => {
-    if (!hasClient) {
+    if (shouldShowOOBE || !hasClient) {
       navigate('/oobe', { replace: true });
     }
-  }, [hasClient, navigate]);
+  }, [hasClient, navigate, shouldShowOOBE]);
 
   if (!hasClient) {
     return null;
@@ -79,13 +80,14 @@ function ProtectedLayout() {
 function ConfiguredStandaloneLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const hasClient = getSupabaseClient() !== null;
+  const shouldShowOOBE = resolveRuntimeConfig().shouldShowOOBE;
+  const hasClient = !shouldShowOOBE && getSupabaseClient() !== null;
 
   useEffect(() => {
-    if (!hasClient) {
+    if (shouldShowOOBE || !hasClient) {
       navigate('/oobe', { replace: true });
     }
-  }, [hasClient, navigate]);
+  }, [hasClient, navigate, shouldShowOOBE]);
 
   if (!hasClient) {
     return null;
@@ -93,7 +95,7 @@ function ConfiguredStandaloneLayout() {
 
   return (
     <div
-      className="min-h-screen text-[#1d1b20] transition-colors duration-300 dark:text-[#e6e0e9]"
+      className="min-h-screen text-neutral-900 transition-colors duration-300 dark:text-neutral-100"
       style={{ backgroundColor: 'rgb(var(--m3-background))' }}
     >
       <main className="min-h-screen px-4 py-6 sm:px-6 md:p-8">
@@ -111,13 +113,13 @@ function AuthGuard() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      navigate('/oobe/register', { replace: true });
+      navigate('/auth', { replace: true });
     }
   }, [isAuthenticated, loading, navigate]);
 
   if (loading || !isAuthenticated) {
     return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center text-sm text-[#49454f] dark:text-[#cac4d0]">
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
         <LoaderCircle aria-hidden="true" className="mr-3 size-5 animate-spin" strokeWidth={2} />
         <span>正在检查登录状态</span>
       </div>
@@ -129,10 +131,6 @@ function AuthGuard() {
 
 export default function App() {
   useOfflineReviewSync();
-
-  useEffect(() => {
-    restoreMaterialTheme();
-  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {

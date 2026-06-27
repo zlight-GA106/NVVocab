@@ -1,7 +1,14 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  NV_SUPABASE_ANON_KEY_STORAGE_KEY,
+  NV_SUPABASE_URL_STORAGE_KEY,
+  normalizeConfigValue,
+  persistRuntimeSupabaseCredentials,
+  resolveRuntimeConfig,
+} from '../utils/config';
 
-export const SUPABASE_URL_STORAGE_KEY = '你的 Supabase URL';
-export const SUPABASE_KEY_STORAGE_KEY = '你的 Supabase Publishable key';
+export const SUPABASE_URL_STORAGE_KEY = NV_SUPABASE_URL_STORAGE_KEY;
+export const SUPABASE_KEY_STORAGE_KEY = NV_SUPABASE_ANON_KEY_STORAGE_KEY;
 
 type WordbaseRow = {
   id: string;
@@ -128,25 +135,6 @@ type CreateSupabaseClientOptions = {
 let cachedClient: WordJiffySupabaseClient | null = null;
 let cachedCredentialsKey: string | null = null;
 
-function stripWrappingQuotes(value: string): string {
-  const trimmed = value.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
-  const quotePairs: Array<[string, string]> = [
-    ['"', '"'],
-    ["'", "'"],
-    ['`', '`'],
-    ['“', '”'],
-    ['‘', '’'],
-  ];
-
-  for (const [start, end] of quotePairs) {
-    if (trimmed.startsWith(start) && trimmed.endsWith(end)) {
-      return trimmed.slice(start.length, trimmed.length - end.length).trim();
-    }
-  }
-
-  return trimmed;
-}
-
 function hasHeaderSafeCharacters(value: string): boolean {
   return /^[\x21-\x7E]+$/u.test(value);
 }
@@ -171,31 +159,31 @@ function getAuthStorageKey(credentials: SupabaseCredentials): string {
 
 export function normalizeSupabaseCredentials(credentials: SupabaseCredentials): SupabaseCredentials {
   return {
-    url: stripWrappingQuotes(credentials.url),
-    key: stripWrappingQuotes(credentials.key).replace(/\s+/g, ''),
+    key: normalizeConfigValue(credentials.key).replace(/\s+/g, ''),
+    url: normalizeConfigValue(credentials.url),
   };
 }
 
 export function validateSupabaseCredentials(credentials: SupabaseCredentials): void {
   if (!credentials.url || !credentials.key) {
-    throw new Error('请填写 Supabase URL 和 API Key。');
+    throw new Error('Supabase URL and Publishable key are required.');
   }
 
   if (!hasHeaderSafeCharacters(credentials.url)) {
-    throw new Error('Supabase URL 只能包含英文字符、数字和标准英文标点，请检查是否混入中文标点或注释。');
+    throw new Error('Supabase URL contains unsupported characters.');
   }
 
   if (!hasHeaderSafeCharacters(credentials.key) || !hasSupabaseKeyCharacters(credentials.key)) {
-    throw new Error('Supabase Publishable key 只能包含英文字符、数字、点、下划线和短横线，请检查是否粘贴了中文注释、中文标点或多余文本。');
+    throw new Error('Supabase Publishable key contains unsupported characters.');
   }
 
   try {
     const parsedUrl = new URL(credentials.url);
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      throw new Error('Supabase URL 必须使用 http 或 https 协议。');
+      throw new Error('Supabase URL must use http or https.');
     }
   } catch {
-    throw new Error('请输入有效的 Supabase URL。');
+    throw new Error('Supabase URL is invalid.');
   }
 }
 
@@ -223,19 +211,17 @@ export function createSupabaseClientFromCredentials(
 }
 
 export function readSupabaseCredentials(): SupabaseCredentials | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+  const config = resolveRuntimeConfig();
 
-  const url = window.localStorage.getItem(SUPABASE_URL_STORAGE_KEY);
-  const key = window.localStorage.getItem(SUPABASE_KEY_STORAGE_KEY);
-
-  if (!url || !key) {
+  if (config.shouldShowOOBE) {
     return null;
   }
 
   try {
-    const credentials = normalizeSupabaseCredentials({ url, key });
+    const credentials = normalizeSupabaseCredentials({
+      key: config.supabaseAnonKey,
+      url: config.supabaseUrl,
+    });
     validateSupabaseCredentials(credentials);
     return credentials;
   } catch {
@@ -246,9 +232,7 @@ export function readSupabaseCredentials(): SupabaseCredentials | null {
 export function persistSupabaseCredentials(credentials: SupabaseCredentials): void {
   const normalizedCredentials = normalizeSupabaseCredentials(credentials);
   validateSupabaseCredentials(normalizedCredentials);
-
-  window.localStorage.setItem(SUPABASE_URL_STORAGE_KEY, normalizedCredentials.url);
-  window.localStorage.setItem(SUPABASE_KEY_STORAGE_KEY, normalizedCredentials.key);
+  persistRuntimeSupabaseCredentials(normalizedCredentials);
   cachedClient = null;
   cachedCredentialsKey = null;
 }

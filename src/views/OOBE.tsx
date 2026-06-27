@@ -1,4 +1,4 @@
-import { useState, type ClipboardEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ClipboardEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   SUPABASE_URL_STORAGE_KEY,
   readSupabaseCredentials,
 } from '../lib/supabase';
+import { resolveRuntimeConfig } from '../utils/config';
 
 type OutlinedFieldProps = {
   autoComplete?: string;
@@ -134,20 +135,31 @@ function OutlinedField({
 
 export default function OOBE() {
   const navigate = useNavigate();
+  const shouldShowOOBE = resolveRuntimeConfig().shouldShowOOBE;
   const existingCredentials = readSupabaseCredentials();
   const [url, setUrl] = useState(existingCredentials?.url ?? '');
   const [key, setKey] = useState(existingCredentials?.key ?? '');
   const { errorMessage, isTesting, status, testAndPersist } = useSupabaseConnection();
   const hasError = status === 'error';
 
+  useEffect(() => {
+    if (!shouldShowOOBE) {
+      navigate('/auth', { replace: true });
+    }
+  }, [navigate, shouldShowOOBE]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const connected = await testAndPersist({ url, key });
     if (connected) {
-      navigate('/oobe/register', { replace: true });
+      window.location.replace('/auth');
     }
   };
+
+  if (!shouldShowOOBE) {
+    return null;
+  }
 
   return (
     <main className="route-transition-page min-h-screen bg-[#fffbff] px-4 py-6 text-[#1d1b20] dark:bg-[#141218] dark:text-[#e6e0e9] sm:px-6 lg:px-8">

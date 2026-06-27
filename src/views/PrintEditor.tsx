@@ -54,7 +54,7 @@ function ToggleControl({ checked, label, onChange }: ToggleControlProps) {
   return (
     <button
       aria-pressed={checked}
-      className="flex h-12 items-center justify-between gap-4 rounded-full border border-[#79747e] px-4 text-sm font-medium text-[#1d1b20] transition-colors hover:bg-[#f3edf7] dark:border-[#938f99] dark:text-[#e6e0e9] dark:hover:bg-[#2b2930]"
+      className="flex h-12 items-center justify-between gap-4 rounded-full border border-neutral-400/70 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 px-4 text-sm font-medium text-neutral-900 dark:text-neutral-100 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/70"
       onClick={() => onChange(!checked)}
       type="button"
     >
@@ -62,13 +62,13 @@ function ToggleControl({ checked, label, onChange }: ToggleControlProps) {
       <span
         className="flex h-6 w-11 items-center rounded-full p-0.5 transition-colors"
         style={{
-          backgroundColor: checked ? 'rgb(var(--m3-primary))' : 'rgb(var(--m3-primary-container) / 0.52)',
+          backgroundColor: checked ? 'rgb(var(--m3-primary))' : 'rgb(var(--m3-surface-variant))',
         }}
       >
         <span
           className="flex size-5 items-center justify-center rounded-full bg-white text-[10px] transition-transform"
           style={{
-            color: checked ? 'rgb(var(--m3-primary))' : '#79747e',
+            color: checked ? 'rgb(var(--m3-primary))' : 'rgb(var(--m3-on-surface-variant))',
             transform: checked ? 'translateX(20px)' : 'translateX(0)',
           }}
         >
@@ -92,7 +92,7 @@ function PaperSegment({
   ];
 
   return (
-    <div className="inline-flex h-12 rounded-full border border-[#79747e] p-1 dark:border-[#938f99]">
+    <div className="inline-flex h-12 rounded-full border border-neutral-400/70 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 p-1 text-neutral-900 dark:text-neutral-100">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = currentPaper === option.value;
@@ -135,7 +135,7 @@ function ViewModeSegment({
   ];
 
   return (
-    <div className="inline-flex h-12 rounded-full border border-[#79747e] p-1 dark:border-[#938f99]">
+    <div className="inline-flex h-12 rounded-full border border-neutral-400/70 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 p-1 text-neutral-900 dark:text-neutral-100">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = mode === option.value;
@@ -219,7 +219,7 @@ function PrintSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {Array.from({ length: 6 }, (_, index) => (
-        <div className="h-24 animate-pulse rounded-2xl bg-[#e7e0ec] dark:bg-[#49454f]" key={index} />
+        <div className="h-24 animate-pulse rounded-2xl bg-white/70 dark:bg-neutral-900/50" key={index} />
       ))}
     </div>
   );
@@ -252,13 +252,13 @@ function QueueManagerPanel({
 }) {
   return (
     <section
-      className="no-print rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+      className="no-print rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-5 shadow-sm backdrop-blur-md  sm:p-6"
       style={surfaceStyle}
     >
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">候选篮管理</h2>
-          <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+          <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">候选篮管理</h2>
+          <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
             拖动左侧抓取手柄调整打印顺序，右侧按钮可剔除不需要打印的词。
           </p>
         </div>
@@ -274,7 +274,7 @@ function QueueManagerPanel({
       </div>
 
       {errorMessage && (
-        <div className="mb-4 flex items-start gap-3 rounded-[18px] border border-[#ba1a1a] bg-[#ffdad6] p-4 text-sm leading-6 text-[#410002] dark:border-[#ffb4ab] dark:bg-[#93000a] dark:text-[#ffdad6]">
+        <div className="mb-4 flex items-start gap-3 rounded-[18px] border border-error/55 bg-error/12 p-4 text-sm leading-6 text-neutral-900 dark:text-neutral-100">
           <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" strokeWidth={2} />
           <span>{errorMessage}</span>
         </div>
@@ -283,7 +283,7 @@ function QueueManagerPanel({
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }, (_, index) => (
-            <div className="h-20 animate-pulse rounded-xl bg-[#e7e0ec] dark:bg-[#49454f]" key={index} />
+            <div className="h-20 animate-pulse rounded-xl bg-white/70 dark:bg-neutral-900/50" key={index} />
           ))}
         </div>
       ) : words.length > 0 ? (
@@ -312,25 +312,25 @@ function QueueManagerPanel({
               >
                 <GripVertical
                   aria-hidden="true"
-                  className="size-5 shrink-0 text-[#79747e] dark:text-[#938f99]"
+                  className="size-5 shrink-0 text-neutral-500 dark:text-neutral-400"
                   strokeWidth={2}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-2">
-                    <h3 className="break-words text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                    <h3 className="break-words text-base font-medium text-neutral-900 dark:text-neutral-100">
                       {word.words}
                     </h3>
                     {word.phonetic && (
-                      <span className="text-xs text-[#79747e] dark:text-[#938f99]">[{word.phonetic}]</span>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">[{word.phonetic}]</span>
                     )}
                   </div>
-                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                     {word.translate}
                   </p>
                 </div>
                 <button
                   aria-label={`从候选篮移除 ${word.words}`}
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-[#ba1a1a] transition-colors hover:bg-[#ffdad6] dark:text-[#ffb4ab] dark:hover:bg-[#410002]"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-error transition-colors hover:bg-error/12"
                   onClick={() => onRemove(word)}
                   type="button"
                 >
@@ -341,10 +341,10 @@ function QueueManagerPanel({
           })}
         </div>
       ) : (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-[24px] border border-white/30 text-center dark:border-white/10">
-          <ListOrdered aria-hidden="true" className="mb-3 size-8 text-[#79747e] dark:text-[#938f99]" strokeWidth={2} />
-          <h3 className="text-lg font-medium text-[#1d1b20] dark:text-[#e6e0e9]">候选篮暂无词条</h3>
-          <p className="mt-2 max-w-md text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+        <div className="flex min-h-64 flex-col items-center justify-center rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 text-center ">
+          <ListOrdered aria-hidden="true" className="mb-3 size-8 text-neutral-500 dark:text-neutral-400" strokeWidth={2} />
+          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">候选篮暂无词条</h3>
+          <p className="mt-2 max-w-md text-sm leading-6 text-neutral-500 dark:text-neutral-400">
             请先在词库一览页将单词加入打印候选，再回来调整排序。
           </p>
         </div>
@@ -558,15 +558,15 @@ export default function PrintEditor() {
   return (
     <div className="print-editor-root space-y-6">
       <header className="no-print space-y-2">
-        <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">打印编辑器 Print Editor</p>
-        <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">印刷排版</h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+        <p className="text-sm font-medium text-primary">打印编辑器 Print Editor</p>
+        <h1 className="text-3xl font-normal text-neutral-900 dark:text-neutral-100">印刷排版</h1>
+        <p className="max-w-3xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
           从词库筛选单词，调整纸张和字号，打印前可直接点选纸面内容进行删改。
         </p>
       </header>
 
       <section
-        className="no-print rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+        className="no-print rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-5 shadow-sm backdrop-blur-md  sm:p-6"
         style={surfaceStyle}
       >
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -581,8 +581,8 @@ export default function PrintEditor() {
               <BookOpenText aria-hidden="true" className="size-5" strokeWidth={2} />
             </div>
             <div>
-              <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">打印控制指挥部</h2>
-              <p className="mt-1 text-sm text-[#49454f] dark:text-[#cac4d0]">
+              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">打印控制指挥部</h2>
+              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                 当前词库 {totalCount} 词，本次排版 {filteredCount} 词。
               </p>
             </div>
@@ -603,7 +603,7 @@ export default function PrintEditor() {
               <span>执行打印</span>
             </button>
             <button
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-[#79747e] px-5 text-sm font-medium text-[#49454f] transition-colors hover:bg-[#f3edf7] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#938f99] dark:text-[#cac4d0] dark:hover:bg-[#2b2930]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-neutral-400/70 dark:border-neutral-700 px-5 text-sm font-medium text-neutral-500 dark:text-neutral-400 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/70 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={printQueue.count === 0}
               onClick={() => setClearDialogOpen(true)}
               type="button"
@@ -616,19 +616,19 @@ export default function PrintEditor() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.1fr)_auto_auto] xl:items-end">
           <label className="block">
-            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">词库范围</span>
+            <span className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">词库范围</span>
             <M3Select icon={Tags} onChange={setSelectedSource} options={sourceOptions} value={selectedSource} />
           </label>
 
           <div>
-            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">纸张规格</span>
+            <span className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">纸张规格</span>
             <PaperSegment currentPaper={paperType} onChange={setPaperType} />
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs text-[#49454f] dark:text-[#cac4d0]">字号微调</span>
-            <div className="flex h-12 items-center gap-3 rounded-[16px] border border-[#79747e] px-4 dark:border-[#938f99]">
-              <Type aria-hidden="true" className="size-4 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
+            <span className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">字号微调</span>
+            <div className="flex h-12 items-center gap-3 rounded-[16px] border border-neutral-400/70 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 px-4 text-neutral-900 dark:text-neutral-100">
+              <Type aria-hidden="true" className="size-4 text-primary" strokeWidth={2} />
               <input
                 className="min-w-28 flex-1 accent-[rgb(var(--m3-primary))]"
                 max={32}
@@ -637,7 +637,7 @@ export default function PrintEditor() {
                 type="range"
                 value={fontSize}
               />
-              <span className="w-12 text-right text-sm text-[#49454f] dark:text-[#cac4d0]">{fontSize}px</span>
+              <span className="w-12 text-right text-sm text-neutral-500 dark:text-neutral-400">{fontSize}px</span>
             </div>
           </label>
         </div>
@@ -648,7 +648,7 @@ export default function PrintEditor() {
         </div>
 
         {errorMessage && (
-          <div className="mt-4 flex items-start gap-3 rounded-[18px] border border-[#ba1a1a] bg-[#ffdad6] p-4 text-sm leading-6 text-[#410002] dark:border-[#ffb4ab] dark:bg-[#93000a] dark:text-[#ffdad6]">
+          <div className="mt-4 flex items-start gap-3 rounded-[18px] border border-error/55 bg-error/12 p-4 text-sm leading-6 text-neutral-900 dark:text-neutral-100">
             <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" strokeWidth={2} />
             <span>{errorMessage}</span>
           </div>
@@ -656,7 +656,7 @@ export default function PrintEditor() {
       </section>
 
       {viewMode === 'preview' ? (
-        <section className="print-editor-preview flex justify-center overflow-x-auto rounded-[28px] border border-white/30 p-4 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6 print:block print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
+        <section className="print-editor-preview flex justify-center overflow-x-auto rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-4 shadow-sm backdrop-blur-md  sm:p-6 print:block print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
           <div
             aria-label={`${paperLabel} 可编辑打印预览`}
             className={[

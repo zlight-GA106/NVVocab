@@ -5,13 +5,16 @@ import {
   CircleUserRound,
   LayoutGrid,
   LogOut,
+  Moon,
   PlusCircle,
   Printer,
   Settings as SettingsIcon,
+  Sun,
   Target,
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 type NavigationItem = {
   to: string;
@@ -103,6 +106,42 @@ function BottomNavigationLink({ item }: { item: NavigationItem }) {
   );
 }
 
+function DarkModeToggle() {
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const Icon = isDarkMode ? Moon : Sun;
+
+  return (
+    <button
+      aria-checked={isDarkMode}
+      aria-label="暗夜模式"
+      className="flex w-full items-center justify-between gap-3 rounded-full px-4 py-3 text-left text-sm font-medium text-[#49454f] transition-colors hover:bg-[#f3edf7] active:scale-[0.98] dark:text-[#cac4d0] dark:hover:bg-[#211f26]"
+      onClick={toggleDarkMode}
+      role="switch"
+      type="button"
+    >
+      <span className="flex items-center gap-4 whitespace-nowrap">
+        <Icon aria-hidden="true" className="size-[18px]" strokeWidth={2} />
+        <span>暗夜模式</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200"
+        style={{
+          backgroundColor: isDarkMode ? 'rgb(var(--m3-primary))' : 'rgb(var(--m3-primary-container))',
+        }}
+      >
+        <span
+          className="absolute top-1 size-5 rounded-full shadow-sm transition-transform duration-200"
+          style={{
+            backgroundColor: isDarkMode ? 'rgb(var(--m3-on-primary))' : 'rgb(var(--m3-surface))',
+            transform: isDarkMode ? 'translateX(1.5rem)' : 'translateX(0.25rem)',
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
 export default function Sidebar({ isAuthenticated, isSubmitting, onSignOut, userLabel }: SidebarProps) {
   return (
     <>
@@ -138,6 +177,7 @@ export default function Sidebar({ isAuthenticated, isSubmitting, onSignOut, user
             {navigationItems.map((item) => (
               <NavigationLink item={item} key={item.to} />
             ))}
+            <DarkModeToggle />
           </nav>
         </div>
 

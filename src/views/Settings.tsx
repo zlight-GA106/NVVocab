@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   AlertTriangle,
+  ChevronDown,
   CheckCircle2,
   Database,
   ImageUp,
@@ -20,17 +21,20 @@ import {
 } from 'react';
 import { useAccountDataDestruction } from '../hooks/useAccountDataDestruction';
 import {
+  buildMaterialThemeFromSeedColor,
   clearMaterialThemeVariables,
   persistMaterialTheme,
   readStoredMaterialTheme,
   type MaterialThemeColors,
 } from '../lib/materialTheme';
+import { characterMaterialThemePresets, type CharacterMaterialThemePreset } from '../lib/themePresets';
 import {
   persistSupabaseCredentials,
   readSupabaseCredentials,
   SUPABASE_KEY_STORAGE_KEY,
   SUPABASE_URL_STORAGE_KEY,
 } from '../lib/supabase';
+import { resolveRuntimeConfig } from '../utils/config';
 
 type RgbColor = {
   blue: number;
@@ -65,6 +69,14 @@ const minimumSeedSaturation = 0.18;
 const minimumSeedLightness = 0.14;
 const maximumSeedLightness = 0.92;
 const colorBucketSize = 24;
+
+function triggerSubtleInteractionFeedback(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.navigator.vibrate?.(8);
+}
 
 function clampColorValue(value: number): number {
   return Math.min(255, Math.max(0, Math.round(value)));
@@ -114,12 +126,33 @@ function getReadableSwatchTextColor(value: string): string {
   return getRgbLuminance(value) > 0.54 ? '#1d1b20' : '#ffffff';
 }
 
+function getReadableTextRgbToken(value: string): string {
+  return getRgbLuminance(value) > 0.54 ? '29 27 32' : '255 255 255';
+}
+
 function getReadableSwatchOverlayColor(value: string): string {
   return getRgbLuminance(value) > 0.54 ? 'rgb(255 255 255 / 0.68)' : 'rgb(0 0 0 / 0.26)';
 }
 
 function getReadableSwatchBorderColor(value: string): string {
   return getRgbLuminance(value) > 0.72 ? 'rgb(0 0 0 / 0.16)' : 'rgb(255 255 255 / 0.36)';
+}
+
+function getSwatchBackgroundImage(value: string): string {
+  if (getRgbLuminance(value) <= 0.82) {
+    return 'none';
+  }
+
+  return [
+    `linear-gradient(rgb(${value} / 0.9), rgb(${value} / 0.9))`,
+    'repeating-linear-gradient(45deg, rgb(0 0 0 / 0.08) 0 1px, transparent 1px 10px)',
+  ].join(', ');
+}
+
+function getSwatchShadow(value: string): string {
+  return getRgbLuminance(value) > 0.82
+    ? 'inset 0 0 0 1px rgb(0 0 0 / 0.18), inset 0 10px 26px rgb(0 0 0 / 0.04)'
+    : 'inset 0 1px 10px rgb(0 0 0 / 0.08)';
 }
 
 function normalizeHue(hue: number): number {
@@ -366,7 +399,7 @@ async function extractDominantColor(file: File): Promise<RgbColor> {
 
 export default function Settings() {
   const storedCredentials = readSupabaseCredentials();
-  const storedTheme = readStoredMaterialTheme();
+  const storedTheme = readStoredMaterialTheme() ?? buildMaterialThemeFromSeedColor(resolveRuntimeConfig().themeSeedColor);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { destroyAccountData, errorMessage, isDestroying } = useAccountDataDestruction();
   const [projectUrl, setProjectUrl] = useState(storedCredentials?.url ?? '');
@@ -378,6 +411,7 @@ export default function Settings() {
   const [isAnalyzingTheme, setIsAnalyzingTheme] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
 
   useEffect(() => {
     if (!credentialSaved) {
@@ -423,6 +457,18 @@ export default function Settings() {
     }
   };
 
+  const applyPresetTheme = (preset: CharacterMaterialThemePreset) => {
+    triggerSubtleInteractionFeedback();
+    setThemeError('');
+    persistMaterialTheme(preset.colors);
+    setTheme(preset.colors);
+  };
+
+  const handlePaletteCollapseToggle = () => {
+    triggerSubtleInteractionFeedback();
+    setPaletteCollapsed((currentValue) => !currentValue);
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -433,17 +479,17 @@ export default function Settings() {
     event.target.value = '';
   };
 
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setIsDraggingFile(true);
   };
 
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setIsDraggingFile(false);
   };
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setIsDraggingFile(false);
 
@@ -453,7 +499,7 @@ export default function Settings() {
     }
   };
 
-  const handleUploadKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleUploadKeyDown = (event: KeyboardEvent<HTMLLabelElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
@@ -574,6 +620,82 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+              色彩预设
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              从角色主题预设中快速切换全站 Material You 色彩。
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {characterMaterialThemePresets.map((preset) => {
+            const isActiveTheme = theme?.themeName === preset.colors.themeName;
+
+            return (
+              <button
+                aria-pressed={isActiveTheme}
+                className="settings-theme-preset rounded-[24px] border p-4 text-left shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                key={preset.id}
+                onClick={() => applyPresetTheme(preset)}
+                style={{
+                  backgroundColor: isActiveTheme
+                    ? 'rgb(var(--m3-primary-container) / 0.5)'
+                    : 'rgb(var(--m3-surface) / 0.56)',
+                  borderColor: isActiveTheme ? 'rgb(var(--m3-primary) / 0.5)' : 'rgb(255 255 255 / 0.32)',
+                }}
+                type="button"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                      {preset.colors.themeName}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[#49454f] dark:text-[#cac4d0]">
+                      {preset.description}
+                    </p>
+                  </div>
+                  {isActiveTheme && (
+                    <CheckCircle2
+                      aria-hidden="true"
+                      className="size-5 shrink-0 text-[#6750a4] dark:text-[#d0bcff]"
+                      strokeWidth={2}
+                    />
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-6 gap-2">
+                  {[
+                    preset.colors.primary,
+                    preset.colors.primaryContainer,
+                    preset.colors.secondary,
+                    preset.colors.tertiary,
+                    preset.colors.surfaceVariant ?? preset.colors.primaryContainer,
+                    preset.colors.surface,
+                  ].map(
+                    (colorToken) => (
+                      <span
+                        aria-hidden="true"
+                        className="h-9 rounded-full border border-white/40 shadow-inner"
+                        key={colorToken}
+                        style={{ backgroundColor: `rgb(${colorToken})` }}
+                      />
+                    ),
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-[#cac4d0] bg-[#fef7ff] p-5 shadow-sm dark:border-[#49454f] dark:bg-[#211f26] sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8def8] text-[#4f378b] dark:bg-[#4f378b] dark:text-[#eaddff]">
+            <Paintbrush aria-hidden="true" className="size-5" strokeWidth={2} />
+          </div>
+          <div>
+            <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
               动态取色
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
@@ -585,23 +707,23 @@ export default function Settings() {
         <input
           accept="image/*"
           className="hidden"
+          id="settings-theme-image-input"
           onChange={handleFileChange}
           ref={fileInputRef}
           type="file"
         />
 
-        <div
-          className={`flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed p-6 text-center transition-colors ${
+        <label
+          className={`flex min-h-48 w-full cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed p-6 text-center transition-[background-color,border-color,box-shadow] duration-200 ${
             isDraggingFile
               ? 'border-[#6750a4] bg-[#e8def8] dark:border-[#d0bcff] dark:bg-[#4a4458]'
               : 'border-[#79747e] bg-transparent hover:bg-[#f3edf7] dark:border-[#938f99] dark:hover:bg-[#2b2930]'
           }`}
-          onClick={() => fileInputRef.current?.click()}
+          htmlFor="settings-theme-image-input"
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onKeyDown={handleUploadKeyDown}
-          role="button"
           tabIndex={0}
         >
           <ImageUp aria-hidden="true" className="mb-3 size-8 text-[#6750a4] dark:text-[#d0bcff]" strokeWidth={2} />
@@ -611,102 +733,162 @@ export default function Settings() {
           <p className="mt-2 max-w-md text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
             取色结果会实时写入全局 CSS 变量，并持久化保存到本地设备。
           </p>
-        </div>
+        </label>
 
         {theme && (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(
-              [
-                { label: '--m3-primary', name: '主色', usage: '按钮与重点操作', value: theme.primary },
-                {
-                  label: '--m3-primary-container',
-                  name: '主色容器',
-                  usage: '导航胶囊与浅色强调',
-                  value: theme.primaryContainer,
-                },
-                { label: '--m3-secondary', name: '辅助色', usage: '图表第二轴', value: theme.secondary },
-                { label: '--m3-tertiary', name: '第三色', usage: '图表第三轴', value: theme.tertiary },
-                { label: '--m3-background', name: '背景色', usage: '全局页面底色', value: theme.background },
-                { label: '--m3-surface', name: '表面色', usage: '卡片与侧边栏', value: theme.surface },
-              ] satisfies PaletteToken[]
-            ).map((item) => {
-              const swatchTextColor = getReadableSwatchTextColor(item.value);
-              const overlayColor = getReadableSwatchOverlayColor(item.value);
-
-              return (
-                <div
-                  className="rounded-[24px] border border-white/30 p-3 shadow-sm backdrop-blur-md dark:border-white/10"
-                  key={item.label}
-                  style={{ backgroundColor: 'rgb(var(--m3-surface) / 0.58)' }}
-                >
-                  <div
-                    className="flex h-24 flex-col justify-between rounded-[18px] border p-3 shadow-inner"
-                    style={{
-                      backgroundColor: `rgb(${item.value})`,
-                      borderColor: getReadableSwatchBorderColor(item.value),
-                      color: swatchTextColor,
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <span
-                        className="rounded-full px-2.5 py-1 text-xs font-medium"
-                        style={{
-                          backgroundColor: overlayColor,
-                          color: swatchTextColor,
-                        }}
-                      >
-                        {item.name}
-                      </span>
-                      <span
-                        className="rounded-full px-2.5 py-1 font-mono text-[11px] font-medium"
-                        style={{
-                          backgroundColor: overlayColor,
-                          color: swatchTextColor,
-                        }}
-                      >
-                        {toHexToken(item.value)}
-                      </span>
-                    </div>
-                    <span
-                      className="w-fit rounded-full px-2.5 py-1 text-xs"
-                      style={{
-                        backgroundColor: overlayColor,
-                        color: swatchTextColor,
-                      }}
-                    >
-                      {item.usage}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <p className="truncate font-mono text-xs font-medium text-[#49454f] dark:text-[#cac4d0]">
-                      {item.label}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[#79747e] dark:text-[#938f99]">RGB</p>
-                        <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                          {item.value}
-                        </p>
-                      </div>
-                      <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[#79747e] dark:text-[#938f99]">HEX</p>
-                        <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
-                          {toHexToken(item.value)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              当前主题：{theme.themeName}
+            </p>
+            <button
+              aria-expanded={!paletteCollapsed}
+              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-full border border-white/30 px-4 text-sm font-medium text-[#6750a4] shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f3edf7] active:translate-y-0 active:scale-[0.98] dark:text-[#d0bcff] dark:hover:bg-[#2b2930] sm:self-auto"
+              onClick={handlePaletteCollapseToggle}
+              type="button"
+            >
+              <span>{paletteCollapsed ? '展开调色板' : '折叠调色板'}</span>
+              <ChevronDown
+                aria-hidden="true"
+                className={`size-4 transition-transform duration-200 ${paletteCollapsed ? '' : 'rotate-180'}`}
+                strokeWidth={2}
+              />
+            </button>
           </div>
         )}
 
         {theme && (
-          <p className="mt-4 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-            当前主题：{theme.themeName}
-          </p>
+          <div
+            aria-hidden={paletteCollapsed}
+            className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+              paletteCollapsed ? 'mt-0 grid-rows-[0fr] opacity-0' : 'mt-5 grid-rows-[1fr] opacity-100'
+            }`}
+          >
+            <div
+              className={`min-h-0 overflow-hidden transition-[transform,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+                paletteCollapsed ? 'pointer-events-none -translate-y-2 scale-[0.985] blur-[1px]' : 'translate-y-0 scale-100 blur-0'
+              }`}
+            >
+              <div className="settings-palette-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(
+                  [
+                    { label: '--m3-primary', name: '主色', usage: '按钮与重点操作', value: theme.primary },
+                    {
+                      label: '--m3-on-primary',
+                      name: '主色文字',
+                      usage: '主色按钮上的文字',
+                      value: theme.onPrimary ?? getReadableTextRgbToken(theme.primary),
+                    },
+                    {
+                      label: '--m3-primary-container',
+                      name: '主色容器',
+                      usage: '导航胶囊与浅色强调',
+                      value: theme.primaryContainer,
+                    },
+                    {
+                      label: '--m3-on-primary-container',
+                      name: '容器文字',
+                      usage: '主色容器上的文字',
+                      value: theme.onPrimaryContainer ?? getReadableTextRgbToken(theme.primaryContainer),
+                    },
+                    { label: '--m3-secondary', name: '辅助色', usage: '图表第二轴', value: theme.secondary },
+                    { label: '--m3-tertiary', name: '第三色', usage: '图表第三轴', value: theme.tertiary },
+                    { label: '--m3-background', name: '背景色', usage: '全局页面底色', value: theme.background },
+                    { label: '--m3-surface', name: '表面色', usage: '卡片与侧边栏', value: theme.surface },
+                    {
+                      label: '--m3-surface-variant',
+                      name: '变体表面',
+                      usage: '图表底槽与弱层级',
+                      value: theme.surfaceVariant ?? theme.primaryContainer,
+                    },
+                    {
+                      label: '--m3-outline',
+                      name: '轮廓线',
+                      usage: '边框与分隔线',
+                      value: theme.outline ?? theme.secondary,
+                    },
+                    {
+                      label: '--m3-on-surface',
+                      name: '表面文字',
+                      usage: '正文与高对比文字',
+                      value: theme.onSurface ?? getReadableTextRgbToken(theme.surface),
+                    },
+                  ] satisfies PaletteToken[]
+                ).map((item) => {
+                  const swatchTextColor = getReadableSwatchTextColor(item.value);
+                  const overlayColor = getReadableSwatchOverlayColor(item.value);
+
+                  return (
+                    <div
+                      className="rounded-[24px] border border-white/30 p-3 shadow-sm backdrop-blur-md dark:border-white/10"
+                      key={item.label}
+                      style={{ backgroundColor: 'rgb(var(--m3-surface) / 0.58)' }}
+                    >
+                      <div
+                        className="flex h-24 flex-col justify-between rounded-[18px] border p-3 shadow-inner"
+                        style={{
+                          backgroundImage: getSwatchBackgroundImage(item.value),
+                          backgroundColor: `rgb(${item.value})`,
+                          borderColor: getReadableSwatchBorderColor(item.value),
+                          color: swatchTextColor,
+                          boxShadow: getSwatchShadow(item.value),
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span
+                            className="rounded-full px-2.5 py-1 text-xs font-medium"
+                            style={{
+                              backgroundColor: overlayColor,
+                              color: swatchTextColor,
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                          <span
+                            className="rounded-full px-2.5 py-1 font-mono text-[11px] font-medium"
+                            style={{
+                              backgroundColor: overlayColor,
+                              color: swatchTextColor,
+                            }}
+                          >
+                            {toHexToken(item.value)}
+                          </span>
+                        </div>
+                        <span
+                          className="w-fit rounded-full px-2.5 py-1 text-xs"
+                          style={{
+                            backgroundColor: overlayColor,
+                            color: swatchTextColor,
+                          }}
+                        >
+                          {item.usage}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <p className="truncate font-mono text-xs font-medium text-[#49454f] dark:text-[#cac4d0]">
+                          {item.label}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-[#79747e] dark:text-[#938f99]">RGB</p>
+                            <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                              {item.value}
+                            </p>
+                          </div>
+                          <div className="rounded-[14px] border border-white/30 bg-white/50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-[#79747e] dark:text-[#938f99]">HEX</p>
+                            <p className="mt-1 font-mono font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                              {toHexToken(item.value)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         )}
 
         {themeError && (

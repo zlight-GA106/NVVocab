@@ -219,7 +219,7 @@ function YearHeatmap({ values }: { values: HeatmapDay[] }) {
   return (
     <div className="w-max">
       <div
-        className="mb-3 grid gap-[3px] text-xs text-[#79747e] dark:text-[#938f99]"
+        className="mb-3 grid gap-[3px] text-xs text-neutral-500 dark:text-neutral-400"
         style={{ gridTemplateColumns: `repeat(${columnCount}, 12px)` }}
       >
         {monthLabels.map((monthLabel) => (
@@ -254,7 +254,7 @@ function CompactHeatmap({ values }: { values: HeatmapDay[] }) {
 
   return (
     <div className="w-max">
-      <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#79747e] dark:text-[#938f99] sm:gap-3">
+      <div className="grid grid-cols-7 gap-2 text-center text-xs text-neutral-500 dark:text-neutral-400 sm:gap-3">
         {tickLabels.map((label, index) => (
           <span className="w-6 whitespace-nowrap" key={`${label}-${index}`}>
             {label}
@@ -265,7 +265,7 @@ function CompactHeatmap({ values }: { values: HeatmapDay[] }) {
         {tickLabels.map((label, index) => (
           <span
             aria-hidden="true"
-            className="mx-auto h-2 border-l border-[#79747e]/55 dark:border-[#938f99]/55"
+            className="mx-auto h-2 border-l border-neutral-500/55 dark:border-neutral-400/55"
             key={`${label}-tick-${index}`}
           />
         ))}
@@ -463,12 +463,12 @@ function M3ChartTooltip({ active, label, payload }: TooltipContentProps) {
 
   return (
     <div
-      className="rounded-[18px] border border-white/30 px-4 py-3 text-xs shadow-lg backdrop-blur-md dark:border-white/10"
+      className="rounded-[18px] border border-neutral-200/40 dark:border-neutral-800 px-4 py-3 text-xs shadow-lg backdrop-blur-md "
       style={{
         backgroundColor: 'rgb(var(--m3-surface) / 0.88)',
       }}
     >
-      <p className="mb-2 font-medium text-[#1d1b20] dark:text-[#e6e0e9]">{label}</p>
+      <p className="mb-2 font-medium text-neutral-900 dark:text-neutral-100">{label}</p>
       <div className="space-y-1.5">
         {payload.map((entry) => {
           const value = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
@@ -476,7 +476,7 @@ function M3ChartTooltip({ active, label, payload }: TooltipContentProps) {
 
           return (
             <div className="flex items-center justify-between gap-4" key={`${name}-${entry.dataKey}`}>
-              <span className="flex items-center gap-2 text-[#49454f] dark:text-[#cac4d0]">
+              <span className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
                 <span
                   aria-hidden="true"
                   className="size-2 rounded-full"
@@ -484,7 +484,7 @@ function M3ChartTooltip({ active, label, payload }: TooltipContentProps) {
                 />
                 <span>{name}</span>
               </span>
-              <span className="font-medium text-[#1d1b20] dark:text-[#e6e0e9]">{value}</span>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">{value}</span>
             </div>
           );
         })}
@@ -501,7 +501,7 @@ function ChartLegend({ items }: { items: Array<{ color: string; label: string }>
   return (
     <div className="flex flex-wrap items-center gap-3">
       {items.map((item) => (
-        <span className="inline-flex items-center gap-2 text-xs text-[#49454f] dark:text-[#cac4d0]" key={item.label}>
+        <span className="inline-flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400" key={item.label}>
           <span aria-hidden="true" className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
           <span>{item.label}</span>
         </span>
@@ -513,13 +513,13 @@ function ChartLegend({ items }: { items: Array<{ color: string; label: string }>
 function PeriodBattleChart({ data }: { data: PeriodBattlePoint[] }) {
   return (
     <div
-      className="flex min-h-[212px] flex-col rounded-[24px] border border-white/30 p-4 backdrop-blur-md dark:border-white/10"
+      className="flex min-h-[212px] flex-col rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-4 backdrop-blur-md "
       style={innerSurfaceStyle}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-[#1d1b20] dark:text-[#e6e0e9]">热力图详细看板</h3>
-          <p className="mt-1 text-xs text-[#79747e] dark:text-[#938f99]">导入、通过与拼错的堆叠分布。</p>
+          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">热力图详细看板</h3>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">导入、通过与拼错的堆叠分布。</p>
         </div>
       </div>
       <ChartLegend
@@ -555,7 +555,7 @@ function PeriodBattleChart({ data }: { data: PeriodBattlePoint[] }) {
 function RetentionTrendChart({ data }: { data: RetentionTrendPoint[] }) {
   return (
     <div
-      className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+      className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
       style={innerSurfaceStyle}
     >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -570,10 +570,10 @@ function RetentionTrendChart({ data }: { data: RetentionTrendPoint[] }) {
             <TrendingUp aria-hidden="true" className="size-5" strokeWidth={2} />
           </div>
           <div>
-            <h3 className="text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+            <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100">
               记忆留存走势
             </h3>
-            <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+            <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
               过去 14 天掌握总量与每日复习负载。
             </p>
           </div>
@@ -756,11 +756,11 @@ export default function Dashboard() {
   return (
     <div className="relative space-y-6">
       <header className="space-y-2">
-        <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">仪表板 Dashboard</p>
-        <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">
+        <p className="text-sm font-medium text-primary">仪表板 Dashboard</p>
+        <h1 className="text-3xl font-normal text-neutral-900 dark:text-neutral-100">
           看得见的长期积累
         </h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+        <p className="max-w-3xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
           每一次默写都会沉淀为复习日志、词库状态和通关进度。
         </p>
       </header>
@@ -773,7 +773,7 @@ export default function Dashboard() {
       )}
 
       <section
-        className="rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+        className="rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-5 shadow-sm backdrop-blur-md  sm:p-6"
         style={surfaceStyle}
       >
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -788,22 +788,22 @@ export default function Dashboard() {
               <Flame aria-hidden="true" className="size-5" strokeWidth={2} />
             </div>
             <div>
-              <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">
                 {getHeatmapTitle(heatmapView)}
               </h2>
-              <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                 当前视图累计复习 {totalReviews} 次，活跃 {reviewedDays} 天。
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded-full border border-[#79747e] p-1 dark:border-[#938f99]">
+            <div className="flex rounded-full border border-neutral-400/70 p-1 dark:border-neutral-700">
               {heatmapViewOptions.map((option) => (
                 <button
                   className={`h-9 rounded-full px-4 text-sm font-medium transition-colors ${
                     heatmapView === option.value
                       ? ''
-                      : 'text-[#49454f] hover:bg-[#f3edf7] dark:text-[#cac4d0] dark:hover:bg-[#2b2930]'
+                      : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800/70'
                   }`}
                   key={option.value}
                   onClick={() => setHeatmapView(option.value)}
@@ -822,7 +822,7 @@ export default function Dashboard() {
               ))}
             </div>
             {loading && (
-              <div className="flex items-center gap-2 text-sm text-[#79747e] dark:text-[#938f99]">
+              <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
                 <LoaderCircle aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
                 <span>同步中</span>
               </div>
@@ -838,7 +838,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
-            <div className="dashboard-heatmap flex min-h-[212px] items-center justify-center overflow-x-auto rounded-[24px] border border-white/30 p-4 backdrop-blur-md dark:border-white/10" style={innerSurfaceStyle}>
+            <div className="dashboard-heatmap flex min-h-[212px] items-center justify-center overflow-x-auto rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-4 backdrop-blur-md " style={innerSurfaceStyle}>
               <CompactHeatmap values={displayedHeatmapValues} />
             </div>
             <PeriodBattleChart data={periodBattleData} />
@@ -848,7 +848,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.95fr)]">
         <section
-          className="space-y-5 rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+          className="space-y-5 rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-5 shadow-sm backdrop-blur-md  sm:p-6"
           style={surfaceStyle}
         >
           <div className="mb-5 flex items-start gap-3">
@@ -862,10 +862,10 @@ export default function Dashboard() {
               <WalletCards aria-hidden="true" className="size-5" strokeWidth={2} />
             </div>
             <div>
-              <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">
                 总概览
               </h2>
-              <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                 词库状态、长期记忆占比和通关距离。
               </p>
             </div>
@@ -873,14 +873,14 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(280px,0.96fr)_minmax(0,1.04fr)]">
             <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+              className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
               style={innerSurfaceStyle}
             >
               <div className="mb-4">
-                <h3 className="text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100">
                   词库状态分布
                 </h3>
-                <p className="mt-1 text-sm text-[#49454f] dark:text-[#cac4d0]">
+                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                   按记忆阶段拆分当前词库。
                 </p>
               </div>
@@ -917,11 +917,11 @@ export default function Dashboard() {
                           className="size-3 shrink-0 rounded-full"
                           style={{ backgroundColor: item.color }}
                         />
-                        <span className="text-sm text-[#49454f] dark:text-[#cac4d0]">
+                        <span className="text-sm text-neutral-500 dark:text-neutral-400">
                           {item.label}
                         </span>
                       </div>
-                      <span className="text-sm font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                         {item.value}
                       </span>
                     </div>
@@ -931,7 +931,7 @@ export default function Dashboard() {
             </div>
 
             <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+              className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
               style={innerSurfaceStyle}
             >
               <div className="mb-8 flex items-start gap-3">
@@ -945,10 +945,10 @@ export default function Dashboard() {
                   <Target aria-hidden="true" className="size-5" strokeWidth={2} />
                 </div>
                 <div>
-                  <h3 className="text-base font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                  <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100">
                     冲刺阶段进度
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+                  <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                     以长期记忆词作为通关口径。
                   </p>
                 </div>
@@ -964,11 +964,11 @@ export default function Dashboard() {
                       >
                         {formatPercent(masteryPercent)}
                       </p>
-                      <p className="mt-1 text-sm text-[#49454f] dark:text-[#cac4d0]">
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                         已掌握 {masteredCount} / {totalWords} 词
                       </p>
                     </div>
-                    <p className="text-right text-sm text-[#79747e] dark:text-[#938f99]">
+                    <p className="text-right text-sm text-neutral-500 dark:text-neutral-400">
                       距离通关还差 {remainingWords} 词
                     </p>
                   </div>
@@ -993,12 +993,12 @@ export default function Dashboard() {
                     { label: '剩余', value: remainingWords },
                   ].map((item) => (
                     <div
-                      className="rounded-[20px] border border-white/30 p-4 dark:border-white/10"
+                      className="rounded-[20px] border border-neutral-200/40 dark:border-neutral-800 p-4 "
                       key={item.label}
                       style={surfaceStyle}
                     >
-                      <p className="text-xs text-[#79747e] dark:text-[#938f99]">{item.label}</p>
-                      <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{item.label}</p>
+                      <p className="mt-1 text-xl font-medium text-neutral-900 dark:text-neutral-100">
                         {item.value}
                       </p>
                     </div>
@@ -1012,7 +1012,7 @@ export default function Dashboard() {
         </section>
 
         <aside
-          className="rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+          className="rounded-[28px] border border-neutral-200/40 dark:border-neutral-800 p-5 shadow-sm backdrop-blur-md  sm:p-6"
           style={surfaceStyle}
         >
           <div className="mb-5 flex items-start gap-3">
@@ -1026,10 +1026,10 @@ export default function Dashboard() {
               <Calendar aria-hidden="true" className="size-5" strokeWidth={2} />
             </div>
             <div>
-              <h2 className="text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">
                 指挥部
               </h2>
-              <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
+              <p className="mt-1 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
                 用最少动作定位今天该做的事情
               </p>
             </div>
@@ -1086,16 +1086,16 @@ export default function Dashboard() {
             </button>
 
             <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+              className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
               style={innerSurfaceStyle}
             >
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-[#49454f] dark:text-[#cac4d0]">
+                <span className="mb-2 block text-sm font-medium text-neutral-500 dark:text-neutral-400">
                   今日复习配额
                 </span>
-                <div className="flex h-12 items-center rounded-[16px] border border-[#79747e] bg-transparent px-4 transition-colors focus-within:border-[#6750a4] focus-within:ring-2 focus-within:ring-[#6750a4] dark:border-[#938f99]">
+                <div className="flex h-12 items-center rounded-[16px] border border-neutral-400/70 bg-white/70 px-4 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary dark:border-neutral-700 dark:bg-neutral-900/50">
                   <input
-                    className="h-full min-w-0 flex-1 bg-transparent text-sm text-[#1d1b20] outline-none placeholder:text-[#79747e] dark:text-[#e6e0e9] dark:placeholder:text-[#938f99]"
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-500 dark:text-neutral-100 dark:placeholder:text-neutral-400"
                     inputMode="numeric"
                     min={1}
                     onChange={handleManualReviewQuotaChange}
@@ -1105,13 +1105,13 @@ export default function Dashboard() {
                   />
                 </div>
               </label>
-              <p className="mt-2 text-xs leading-5 text-[#79747e] dark:text-[#938f99]">
+              <p className="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
                 留空时根据今日已完成复习与剩余到期词自动计算，自动上限为 {maxAutoReviewQuota} 词。
               </p>
             </div>
 
             <div
-              className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+              className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
               style={innerSurfaceStyle}
             >
               <div className="flex items-start justify-between gap-3">
@@ -1126,18 +1126,18 @@ export default function Dashboard() {
                     <CalendarClock aria-hidden="true" className="size-5" strokeWidth={2} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">下一轮复习时间：</p>
-                    <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">下一轮复习时间：</p>
+                    <p className="mt-1 text-xl font-medium text-neutral-900 dark:text-neutral-100">
                       {nextReviewSchedule.loading ? '正在计算' : nextReviewSchedule.countdownText}
                     </p>
-                    <p className="mt-1 truncate text-xs text-[#79747e] dark:text-[#938f99]">
+                    <p className="mt-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
                       {nextReviewSchedule.reviewDateText}
                     </p>
                   </div>
                 </div>
                 <button
                   aria-label="开启提前突击"
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f3edf7] dark:hover:bg-[#2b2930]"
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/70"
                   onClick={() => void handleEnableCramMode()}
                   style={{ color: m3PrimaryColor }}
                   title="提前突击"
@@ -1147,7 +1147,7 @@ export default function Dashboard() {
                 </button>
               </div>
               <div className="mt-4 flex items-center justify-between gap-4 rounded-[18px] px-4 py-3" style={{ backgroundColor: 'rgb(var(--m3-surface) / 0.6)' }}>
-                <span className="text-sm text-[#49454f] dark:text-[#cac4d0]">下一轮自动复习单词数</span>
+                <span className="text-sm text-neutral-500 dark:text-neutral-400">下一轮自动复习单词数</span>
                 <span className="rounded-full px-3 py-1 text-sm font-medium" style={{ backgroundColor: m3PrimaryContainerColor, color: m3PrimaryColor }}>
                   {nextReviewSchedule.nextReviewWordCount} 词
                 </span>
@@ -1156,12 +1156,12 @@ export default function Dashboard() {
 
             {showCramNotification && (
               <button
-                className="dashboard-cram-notice flex w-full items-start gap-3 overflow-hidden rounded-[24px] border border-white/40 p-4 text-left text-sm leading-6 shadow-sm backdrop-blur-md transition-[background-color,box-shadow,transform] duration-200 hover:bg-white/70 hover:shadow-md active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/10 dark:hover:bg-neutral-900/70"
+                className="dashboard-cram-notice flex w-full items-start gap-3 overflow-hidden rounded-[24px] border border-white/40 p-4 text-left text-sm leading-6 shadow-sm backdrop-blur-md transition-[background-color,box-shadow,transform] duration-200 hover:bg-white/70 hover:shadow-md active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2  dark:hover:bg-neutral-900/70"
                 data-state={isCramNotificationLeaving ? 'leaving' : 'entered'}
                 onClick={dismissCramNotification}
                 style={{
                   backgroundColor: 'rgb(var(--m3-surface) / 0.78)',
-                  color: '#1d1b20',
+                  color: 'inherit',
                   outlineColor: m3PrimaryColor,
                 }}
                 type="button"
@@ -1176,14 +1176,14 @@ export default function Dashboard() {
                   <Zap aria-hidden="true" className="size-5" strokeWidth={2} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-[#1d1b20] dark:text-[#e6e0e9]">提前突击已开启</span>
-                  <span className="mt-1 block text-[#49454f] dark:text-[#cac4d0]">
+                  <span className="block font-medium text-neutral-900 dark:text-neutral-100">提前突击已开启</span>
+                  <span className="mt-1 block text-neutral-500 dark:text-neutral-400">
                     进入默写页会纳入未来 12 小时词条。点击此通知可关闭。
                   </span>
                 </span>
                 <X
                   aria-hidden="true"
-                  className="mt-1 size-4 shrink-0 text-[#79747e] dark:text-[#938f99]"
+                  className="mt-1 size-4 shrink-0 text-neutral-500 dark:text-neutral-400"
                   strokeWidth={2}
                 />
               </button>
@@ -1191,7 +1191,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-2 gap-4">
               <div
-                className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+                className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
                 style={innerSurfaceStyle}
               >
                 <div className="space-y-3">
@@ -1205,8 +1205,8 @@ export default function Dashboard() {
                     <Flame aria-hidden="true" className="size-5" strokeWidth={2} />
                   </div>
                   <div>
-                    <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">连续打卡</p>
-                    <p className="mt-1 text-2xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">连续打卡</p>
+                    <p className="mt-1 text-2xl font-medium text-neutral-900 dark:text-neutral-100">
                       {streakDays} 天
                     </p>
                   </div>
@@ -1214,12 +1214,12 @@ export default function Dashboard() {
               </div>
 
               <div
-                className="rounded-[24px] border border-white/30 p-5 backdrop-blur-md dark:border-white/10"
+                className="rounded-[24px] border border-neutral-200/40 dark:border-neutral-800 p-5 backdrop-blur-md "
                 style={innerSurfaceStyle}
               >
                 <div className="mb-3">
-                  <p className="text-sm text-[#49454f] dark:text-[#cac4d0]">今日新增</p>
-                  <p className="mt-1 text-xl font-medium text-[#1d1b20] dark:text-[#e6e0e9]">
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">今日新增</p>
+                  <p className="mt-1 text-xl font-medium text-neutral-900 dark:text-neutral-100">
                     {dailyTargetText}
                   </p>
                 </div>

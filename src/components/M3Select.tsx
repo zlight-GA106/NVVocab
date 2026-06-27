@@ -23,12 +23,15 @@ type MenuPosition = {
   width: number;
 };
 
+const selectMenuExitDurationMs = 180;
+
 function getSelectedLabel(options: M3SelectOption[], value: string): ReactNode {
   return options.find((option) => option.value === value)?.label ?? '未选择';
 }
 
 export default function M3Select({ disabled = false, icon: Icon, onChange, options, value }: M3SelectProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -64,7 +67,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
   }, []);
 
   useEffect(() => {
-    if (!open) {
+    if (!mounted) {
       return undefined;
     }
 
@@ -82,7 +85,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
 
     window.addEventListener('pointerdown', handlePointerDown);
     return () => window.removeEventListener('pointerdown', handlePointerDown);
-  }, [open]);
+  }, [mounted]);
 
   useEffect(() => {
     if (!disabled) {
@@ -93,8 +96,21 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
   }, [disabled]);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setMounted(true);
+      return undefined;
+    }
+
+    const closeTimer = window.setTimeout(() => {
+      setMounted(false);
       setMenuPosition(null);
+    }, selectMenuExitDurationMs);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!mounted) {
       return undefined;
     }
 
@@ -106,7 +122,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
       window.removeEventListener('resize', updateMenuPosition);
       window.removeEventListener('scroll', updateMenuPosition, true);
     };
-  }, [open, updateMenuPosition]);
+  }, [mounted, updateMenuPosition]);
 
   const commitValue = (nextValue: string) => {
     if (nextValue !== value) {
@@ -155,7 +171,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
     <div className="relative" ref={rootRef}>
       <button
         aria-expanded={open}
-        className="flex h-12 w-full items-center rounded-[16px] border border-[#79747e] bg-transparent px-4 text-left text-sm text-[#1d1b20] transition-colors focus:border-[#6750a4] focus:outline-none focus:ring-2 focus:ring-[#6750a4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#938f99] dark:text-[#e6e0e9]"
+        className="flex h-12 w-full items-center rounded-[16px] border border-neutral-400/70 dark:border-neutral-700 bg-white/70 dark:bg-neutral-900/50 px-4 text-left text-sm text-neutral-900 dark:text-neutral-100 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={handleKeyDown}
@@ -164,23 +180,24 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
         {Icon && (
           <Icon
             aria-hidden="true"
-            className="mr-3 size-4 shrink-0 text-[#6750a4] dark:text-[#d0bcff]"
+            className="mr-3 size-4 shrink-0 text-primary"
             strokeWidth={2}
           />
         )}
         <span className="min-w-0 flex-1 truncate">{getSelectedLabel(options, value)}</span>
         <ChevronDown
           aria-hidden="true"
-          className={`ml-3 size-4 shrink-0 text-[#79747e] transition-transform dark:text-[#938f99] ${
+          className={`ml-3 size-4 shrink-0 text-neutral-500 dark:text-neutral-400 transition-transform ${
             open ? 'rotate-180' : ''
           }`}
           strokeWidth={2}
         />
       </button>
 
-      {open && menuPosition && createPortal(
+      {mounted && menuPosition && createPortal(
         <div
-          className="fixed z-[10000] overflow-y-auto rounded-2xl border border-white/30 p-2 shadow-2xl backdrop-blur-md dark:border-white/10"
+          className="m3-select-menu fixed z-[10000] overflow-y-auto rounded-2xl border border-neutral-200/40 p-2 text-neutral-900 shadow-2xl backdrop-blur-md dark:border-neutral-800 dark:text-neutral-100"
+          data-state={open ? 'open' : 'closed'}
           ref={menuRef}
           style={{
             backgroundColor: 'rgb(var(--m3-surface) / 0.94)',
@@ -195,7 +212,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
 
             return (
               <button
-                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[#f3edf7] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-[#2b2930]"
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-neutral-900 dark:text-neutral-100 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/70 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={option.disabled}
                 key={`${option.value}-${index}`}
                 onClick={() => commitValue(option.value)}
@@ -217,7 +234,7 @@ export default function M3Select({ disabled = false, icon: Icon, onChange, optio
             );
           })}
           {options.length === 0 && (
-            <div className="px-3 py-4 text-sm text-[#79747e] dark:text-[#938f99]">暂无可选项</div>
+            <div className="px-3 py-4 text-sm text-neutral-500 dark:text-neutral-400">暂无可选项</div>
           )}
         </div>,
         document.body,
