@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowUpDown,
@@ -40,6 +40,7 @@ const strongSurfaceStyle = {
 } satisfies React.CSSProperties;
 
 const deleteAnimationDurationMs = 260;
+const listTransitionDurationMs = 150;
 
 const sortModeOptions: M3SelectOption[] = [
   { label: '最近导入优先', value: 'introtimeDesc' },
@@ -94,6 +95,7 @@ function getProficiencyBarStyle(band: ProficiencyBand): React.CSSProperties {
 }
 
 function WordCard({
+  index,
   isDeleting,
   isQueued,
   onDelete,
@@ -101,6 +103,7 @@ function WordCard({
   onTogglePrintQueue,
   word,
 }: {
+  index: number;
   isDeleting: boolean;
   isQueued: boolean;
   onDelete: (word: WordItem) => void;
@@ -115,7 +118,10 @@ function WordCard({
       className={`rounded-2xl border border-white/30 p-4 shadow-sm backdrop-blur-md transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] dark:border-white/10 ${
         isDeleting ? 'pointer-events-none -translate-y-2 scale-[0.98] opacity-0 blur-[1px]' : 'translate-y-0 scale-100 opacity-100'
       }`}
-      style={strongSurfaceStyle}
+      style={{
+        ...strongSurfaceStyle,
+        transitionDelay: isDeleting ? '0ms' : `${Math.min(index * 18, 126)}ms`,
+      }}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -236,25 +242,6 @@ function WordCard({
   );
 }
 
-function SkeletonGrid() {
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div
-          className="h-44 animate-pulse rounded-2xl border border-white/30 p-4 backdrop-blur-md dark:border-white/10"
-          key={index}
-          style={strongSurfaceStyle}
-        >
-          <div className="h-6 w-32 rounded-full bg-[#e7e0ec] dark:bg-[#49454f]" />
-          <div className="mt-4 h-4 w-24 rounded-full bg-[#e7e0ec] dark:bg-[#49454f]" />
-          <div className="mt-6 h-4 w-full rounded-full bg-[#e7e0ec] dark:bg-[#49454f]" />
-          <div className="mt-3 h-4 w-2/3 rounded-full bg-[#e7e0ec] dark:bg-[#49454f]" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function Lexicon() {
   const [alphabetFilter, setAlphabetFilter] = useState<AlphabetFilter>('all');
   const [bookTag, setBookTag] = useState(allBookTagValue);
@@ -267,6 +254,68 @@ export default function Lexicon() {
     bookTag,
     sortMode,
   });
+  const [displayedWords, setDisplayedWords] = useState<WordItem[]>([]);
+  const [contentVisible, setContentVisible] = useState(false);
+  const [hasResolvedOnce, setHasResolvedOnce] = useState(false);
+  const [locallyRemovedWordIds, setLocallyRemovedWordIds] = useState<Set<string>>(() => new Set());
+  const hasResolvedOnceRef = useRef(false);
+  const listTransitionTimeoutRef = useRef<number | null>(null);
+  const visibleWords = useMemo(
+    () => displayedWords.filter((word) => !locallyRemovedWordIds.has(word.id)),
+    [displayedWords, locallyRemovedWordIds],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (listTransitionTimeoutRef.current !== null) {
+        window.clearTimeout(listTransitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (listTransitionTimeoutRef.current !== null) {
+      window.clearTimeout(listTransitionTimeoutRef.current);
+      listTransitionTimeoutRef.current = null;
+    }
+
+    if (loading) {
+      if (hasResolvedOnceRef.current) {
+        setContentVisible(false);
+      }
+      return;
+    }
+
+    if (!hasResolvedOnceRef.current) {
+      hasResolvedOnceRef.current = true;
+      setHasResolvedOnce(true);
+      setDisplayedWords(words);
+      window.requestAnimationFrame(() => {
+        setContentVisible(true);
+      });
+      return;
+    }
+
+    listTransitionTimeoutRef.current = window.setTimeout(() => {
+      setDisplayedWords(words);
+      window.requestAnimationFrame(() => {
+        setContentVisible(true);
+      });
+    }, listTransitionDurationMs);
+  }, [loading, words]);
+
+  useEffect(() => {
+    if (locallyRemovedWordIds.size === 0) {
+      return;
+    }
+
+    const latestWordIds = new Set(words.map((word) => word.id));
+    setLocallyRemovedWordIds((current) => {
+      const next = new Set(Array.from(current).filter((wordId) => latestWordIds.has(wordId)));
+      return next.size === current.size ? current : next;
+    });
+  }, [locallyRemovedWordIds.size, words]);
+
   const bookTagOptions = useMemo<M3SelectOption[]>(
     () => [
       { label: '所有单元', value: allBookTagValue },
@@ -298,22 +347,29 @@ export default function Lexicon() {
       window.setTimeout(resolve, deleteAnimationDurationMs);
     });
 
+    setLocallyRemovedWordIds((current) => new Set(current).add(targetWord.id));
     const deleted = await deleteWord(targetWord.id);
 
     if (deleted) {
       printQueue.remove(targetWord.id);
+    } else {
+      setLocallyRemovedWordIds((current) => {
+        const next = new Set(current);
+        next.delete(targetWord.id);
+        return next;
+      });
     }
 
     setWordAnimatingDeleteId(null);
   };
 
   const handleAddPageToPrintQueue = () => {
-    printQueue.addMany(words.map((word) => word.id));
+    printQueue.addMany(visibleWords.map((word) => word.id));
   };
 
   const handleArrangePrintQueueByProficiency = () => {
     const now = new Date();
-    const arrangedWordIds = [...words]
+    const arrangedWordIds = [...visibleWords]
       .sort((first, second) => compareByAdaptiveProficiency(first, second, now))
       .map((word) => word.id);
 
@@ -373,7 +429,7 @@ export default function Lexicon() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading || words.length === 0}
+              disabled={visibleWords.length === 0}
               onClick={handleAddPageToPrintQueue}
               style={{
                 backgroundColor: 'rgb(var(--m3-primary-container))',
@@ -386,7 +442,7 @@ export default function Lexicon() {
             </button>
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading || words.length === 0}
+              disabled={visibleWords.length === 0}
               onClick={handleArrangePrintQueueByProficiency}
               style={{
                 backgroundColor: 'rgb(var(--m3-primary-container))',
@@ -397,12 +453,6 @@ export default function Lexicon() {
               <ListOrdered aria-hidden="true" className="size-4" strokeWidth={2} />
               <span>按熟练度编排打印候选</span>
             </button>
-            {loading && (
-              <div className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#79747e] dark:text-[#938f99]">
-                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
-                <span>正在同步</span>
-              </div>
-            )}
           </div>
         </div>
       </section>
@@ -434,7 +484,7 @@ export default function Lexicon() {
 
               return (
                 <button
-                  className="h-9 rounded-full border border-white/30 px-4 text-sm font-medium transition-colors hover:bg-[#f3edf7] dark:border-white/10 dark:hover:bg-[#2b2930]"
+                  className="h-9 rounded-full border border-white/30 px-4 text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-[250ms] ease-[cubic-bezier(0.2,0,0,1)] hover:bg-[#f3edf7] active:bg-[#eaddff] dark:border-white/10 dark:hover:bg-[#2b2930] dark:active:bg-[#36313d]"
                   key={letter}
                   onClick={() => setAlphabetFilter(letter)}
                   style={
@@ -480,15 +530,21 @@ export default function Lexicon() {
       )}
 
       <section
-        className="rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
+        aria-busy={loading}
+        className="min-h-[320px] rounded-[28px] border border-white/30 p-5 shadow-sm backdrop-blur-md dark:border-white/10 sm:p-6"
         style={surfaceStyle}
       >
-        {loading ? (
-          <SkeletonGrid />
-        ) : words.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {words.map((word) => (
+        {!hasResolvedOnce ? (
+          <div className="min-h-[280px]" />
+        ) : visibleWords.length > 0 ? (
+          <div
+            className={`grid grid-cols-1 gap-4 transition-[opacity,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] md:grid-cols-2 ${
+              contentVisible ? 'opacity-100 blur-0' : 'opacity-0 blur-[1px]'
+            }`}
+          >
+            {visibleWords.map((word, index) => (
               <WordCard
+                index={index}
                 isDeleting={deletingWordId === word.id || wordAnimatingDeleteId === word.id}
                 isQueued={printQueue.has(word.id)}
                 key={word.id}
@@ -500,7 +556,11 @@ export default function Lexicon() {
             ))}
           </div>
         ) : (
-          <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
+          <div
+            className={`flex min-h-[280px] flex-col items-center justify-center text-center transition-[opacity,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${
+              contentVisible ? 'opacity-100 blur-0' : 'opacity-0 blur-[1px]'
+            }`}
+          >
             <div
               className="mb-4 flex h-12 w-12 items-center justify-center rounded-full"
               style={{

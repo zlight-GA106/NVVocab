@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseClient, type Database } from '../lib/supabase';
 import { getWordProficiency } from '../utils/proficiencyRating';
 
@@ -149,8 +149,11 @@ export function useLexicon({ alphabetFilter, bookTag, sortMode }: UseLexiconOpti
     words: [],
   });
   const [deletingWordId, setDeletingWordId] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const loadLexicon = useCallback(async (showLoading = true) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     const supabase = getSupabaseClient();
 
     if (!supabase) {
@@ -214,6 +217,10 @@ export function useLexicon({ alphabetFilter, bookTag, sortMode }: UseLexiconOpti
 
       const normalizedWords = (wordResult.data ?? []).map(normalizeWord);
 
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setState({
         bookTags: extractBookTags(tagResult.data ?? []),
         errorMessage: '',
@@ -223,6 +230,10 @@ export function useLexicon({ alphabetFilter, bookTag, sortMode }: UseLexiconOpti
         words: sortWordsByProficiency(normalizedWords, sortMode),
       });
     } catch (error: unknown) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setState((current) => ({
         ...current,
         errorMessage: getErrorMessage(error),
