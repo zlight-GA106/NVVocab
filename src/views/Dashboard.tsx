@@ -84,6 +84,7 @@ const heatmapViewOptions: HeatmapViewOption[] = [
 const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 const maxAutoReviewQuota = 100;
 const cramNotificationDurationMs = 60_000;
+const cramNotificationExitDurationMs = 180;
 const reviewQuotaStorageKey = 'WORD_JIFFY_DAILY_REVIEW_QUOTA';
 const m3PrimaryColor = 'rgb(var(--m3-primary))';
 const m3PrimaryContainerColor = 'rgb(var(--m3-primary-container))';
@@ -121,6 +122,10 @@ function readStoredReviewQuota(): ReviewQuotaInput {
   }
 
   return normalizeReviewQuotaInput(window.localStorage.getItem(reviewQuotaStorageKey) ?? '');
+}
+
+function triggerSubtleHapticFeedback(): void {
+  window.navigator.vibrate?.(10);
 }
 
 function getHeatmapCellLevel(count: number): string {
@@ -656,7 +661,8 @@ export default function Dashboard() {
   const nextReviewSchedule = useNextReviewSchedule();
   const [heatmapView, setHeatmapView] = useState<HeatmapView>('month');
   const [manualReviewQuota, setManualReviewQuota] = useState<ReviewQuotaInput>(() => readStoredReviewQuota());
-  const [cramActionMessage, setCramActionMessage] = useState('');
+  const [showCramNotification, setShowCramNotification] = useState(false);
+  const [isCramNotificationLeaving, setIsCramNotificationLeaving] = useState(false);
 
   useEffect(() => {
     if (manualReviewQuota === '') {
@@ -672,22 +678,46 @@ export default function Dashboard() {
   };
 
   const handleEnableCramMode = async () => {
+    triggerSubtleHapticFeedback();
     enableCramMode();
-    setCramActionMessage('提前突击已开启，进入默写页会纳入未来 12 小时词条。');
-    await Promise.all([refreshDashboardStats(), nextReviewSchedule.refresh()]);
+    setShowCramNotification(true);
+    setIsCramNotificationLeaving(false);
+    void Promise.all([refreshDashboardStats(), nextReviewSchedule.refresh()]);
+  };
+
+  const dismissCramNotification = () => {
+    if (!showCramNotification || isCramNotificationLeaving) {
+      return;
+    }
+
+    triggerSubtleHapticFeedback();
+    setIsCramNotificationLeaving(true);
   };
 
   useEffect(() => {
-    if (!cramActionMessage) {
+    if (!showCramNotification || isCramNotificationLeaving) {
       return undefined;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setCramActionMessage('');
+      setIsCramNotificationLeaving(true);
     }, cramNotificationDurationMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [cramActionMessage]);
+  }, [isCramNotificationLeaving, showCramNotification]);
+
+  useEffect(() => {
+    if (!isCramNotificationLeaving) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowCramNotification(false);
+      setIsCramNotificationLeaving(false);
+    }, cramNotificationExitDurationMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isCramNotificationLeaving]);
 
   const masteryPercent = totalWords > 0 ? (masteredCount / totalWords) * 100 : 0;
   const remainingWords = Math.max(totalWords - masteredCount, 0);
@@ -725,35 +755,6 @@ export default function Dashboard() {
 
   return (
     <div className="relative space-y-6">
-      {cramActionMessage && (
-        <button
-          className="fixed right-4 top-4 z-40 flex max-w-sm items-start gap-3 rounded-[24px] border border-white/40 p-4 text-left text-sm leading-6 shadow-xl backdrop-blur-md transition-colors hover:bg-white/70 dark:border-white/10 dark:hover:bg-neutral-900/70 sm:right-8 sm:top-8"
-          onClick={() => setCramActionMessage('')}
-          style={{
-            backgroundColor: 'rgb(var(--m3-surface) / 0.88)',
-            color: '#1d1b20',
-          }}
-          type="button"
-        >
-          <span
-            className="flex size-10 shrink-0 items-center justify-center rounded-full"
-            style={{
-              backgroundColor: m3PrimaryContainerColor,
-              color: m3PrimaryColor,
-            }}
-          >
-            <Zap aria-hidden="true" className="size-5" strokeWidth={2} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-medium text-[#1d1b20] dark:text-[#e6e0e9]">提前突击已开启</span>
-            <span className="mt-1 block text-[#49454f] dark:text-[#cac4d0]">
-              进入默写页会纳入未来 12 小时词条。点击此通知可关闭。
-            </span>
-          </span>
-          <X aria-hidden="true" className="mt-1 size-4 shrink-0 text-[#79747e] dark:text-[#938f99]" strokeWidth={2} />
-        </button>
-      )}
-
       <header className="space-y-2">
         <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">仪表板 Dashboard</p>
         <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">
@@ -1152,6 +1153,41 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
+
+            {showCramNotification && (
+              <button
+                className="dashboard-cram-notice flex w-full items-start gap-3 overflow-hidden rounded-[24px] border border-white/40 p-4 text-left text-sm leading-6 shadow-sm backdrop-blur-md transition-[background-color,box-shadow,transform] duration-200 hover:bg-white/70 hover:shadow-md active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/10 dark:hover:bg-neutral-900/70"
+                data-state={isCramNotificationLeaving ? 'leaving' : 'entered'}
+                onClick={dismissCramNotification}
+                style={{
+                  backgroundColor: 'rgb(var(--m3-surface) / 0.78)',
+                  color: '#1d1b20',
+                  outlineColor: m3PrimaryColor,
+                }}
+                type="button"
+              >
+                <span
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: m3PrimaryContainerColor,
+                    color: m3PrimaryColor,
+                  }}
+                >
+                  <Zap aria-hidden="true" className="size-5" strokeWidth={2} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-[#1d1b20] dark:text-[#e6e0e9]">提前突击已开启</span>
+                  <span className="mt-1 block text-[#49454f] dark:text-[#cac4d0]">
+                    进入默写页会纳入未来 12 小时词条。点击此通知可关闭。
+                  </span>
+                </span>
+                <X
+                  aria-hidden="true"
+                  className="mt-1 size-4 shrink-0 text-[#79747e] dark:text-[#938f99]"
+                  strokeWidth={2}
+                />
+              </button>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div
