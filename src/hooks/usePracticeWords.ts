@@ -40,9 +40,12 @@ function shuffleWords(words: PracticeWord[]): PracticeWord[] {
   return shuffledWords;
 }
 
-function sortAdaptiveWords(words: PracticeWord[], limit: number): PracticeWord[] {
+function sortByProficiency(words: PracticeWord[], limit: number, direction: 'asc' | 'desc'): PracticeWord[] {
   const now = new Date();
-  return [...words].sort((first, second) => compareByAdaptiveProficiency(first, second, now)).slice(0, limit);
+  const multiplier = direction === 'asc' ? 1 : -1;
+  return [...words]
+    .sort((first, second) => compareByAdaptiveProficiency(first, second, now) * multiplier)
+    .slice(0, limit);
 }
 
 export function usePracticeWords({
@@ -92,7 +95,7 @@ export function usePracticeWords({
         practiceWordsQuery = practiceWordsQuery.eq('book_tag', bookTag);
       }
 
-      if (sortMode === 'adaptive') {
+      if (sortMode === 'proficiencyAsc' || sortMode === 'proficiencyDesc') {
         practiceWordsQuery = practiceWordsQuery
           .order('repetitions', { ascending: true })
           .order('wrong_count', { ascending: false })
@@ -107,7 +110,10 @@ export function usePracticeWords({
         practiceWordsQuery = practiceWordsQuery.order('introtime', { ascending: false });
       }
 
-      const queryLimit = sortMode === 'adaptive' ? Math.min(500, Math.max(limit * 4, limit)) : limit;
+      const queryLimit =
+        sortMode === 'proficiencyAsc' || sortMode === 'proficiencyDesc'
+          ? Math.min(500, Math.max(limit * 4, limit))
+          : limit;
       const { data, error } = await practiceWordsQuery.limit(queryLimit);
 
       if (error) {
@@ -118,9 +124,11 @@ export function usePracticeWords({
       const nextWords =
         sortMode === 'random'
           ? shuffleWords(loadedWords)
-          : sortMode === 'adaptive'
-            ? sortAdaptiveWords(loadedWords, limit)
-            : loadedWords;
+          : sortMode === 'proficiencyAsc'
+            ? sortByProficiency(loadedWords, limit, 'asc')
+            : sortMode === 'proficiencyDesc'
+              ? sortByProficiency(loadedWords, limit, 'desc')
+              : loadedWords;
 
       setWords(nextWords);
       setCurrentIndex(0);

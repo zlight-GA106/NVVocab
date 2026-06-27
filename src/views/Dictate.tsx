@@ -35,7 +35,8 @@ type ReviewRunConfig = {
 
 const systemManagedReviewLimit = 100;
 const sortOptions: Array<{ label: string; value: WordQueueSort }> = [
-  { label: '根据熟练度自动排序', value: 'adaptive' },
+  { label: '根据熟练度从低到高排序', value: 'proficiencyAsc' },
+  { label: '根据熟练度从高到低排序', value: 'proficiencyDesc' },
   { label: '最早导入优先', value: 'introtimeAsc' },
   { label: '最近导入优先', value: 'introtimeDesc' },
   { label: '随机乱序', value: 'random' },
@@ -47,22 +48,30 @@ type RouteBasketConfig = {
   sortMode: WordQueueSort;
 };
 
-function isWordQueueSort(value: string | null): value is WordQueueSort {
-  return value === 'adaptive' || value === 'introtimeAsc' || value === 'introtimeDesc' || value === 'random';
+function normalizeWordQueueSort(value: string | null): WordQueueSort | null {
+  if (value === 'adaptive' || value === 'proficiencyAsc') {
+    return 'proficiencyAsc';
+  }
+
+  if (value === 'proficiencyDesc' || value === 'introtimeAsc' || value === 'introtimeDesc' || value === 'random') {
+    return value;
+  }
+
+  return null;
 }
 
 function readRouteBasketConfig(search: string): RouteBasketConfig | null {
   const params = new URLSearchParams(search);
-  const sortModeParam = params.get('sort');
+  const sortMode = normalizeWordQueueSort(params.get('sort'));
 
-  if (!isWordQueueSort(sortModeParam)) {
+  if (!sortMode) {
     return null;
   }
 
   return {
     autostart: params.get('autostart') === '1',
     bookTag: params.get('bookTag') || allDueReviewBookTagValue,
-    sortMode: sortModeParam,
+    sortMode,
   };
 }
 
@@ -72,7 +81,7 @@ export default function Dictate() {
   const [initialRouteConfig] = useState<RouteBasketConfig | null>(() => readRouteBasketConfig(location.search));
   const [dictateMode, setDictateMode] = useState<DictateMode>('review');
   const [selectedBookTag, setSelectedBookTag] = useState(initialRouteConfig?.bookTag ?? allDueReviewBookTagValue);
-  const [sortMode, setSortMode] = useState<WordQueueSort>(initialRouteConfig?.sortMode ?? 'adaptive');
+  const [sortMode, setSortMode] = useState<WordQueueSort>(initialRouteConfig?.sortMode ?? 'proficiencyAsc');
   const [customLimit, setCustomLimit] = useState<number | ''>('');
   const [reviewRunConfig, setReviewRunConfig] = useState<ReviewRunConfig | null>(() => {
     if (!initialRouteConfig?.autostart) {
@@ -199,7 +208,13 @@ export default function Dictate() {
   };
 
   const handleSortModeChange = (nextValue: string) => {
-    setSortMode(nextValue as WordQueueSort);
+    const nextSortMode = normalizeWordQueueSort(nextValue);
+
+    if (!nextSortMode) {
+      return;
+    }
+
+    setSortMode(nextSortMode);
     setPracticeRunStarted(false);
   };
 
@@ -209,7 +224,7 @@ export default function Dictate() {
       bookTag: selectedBookTag,
       limit: hasCustomLimit ? customLimit : systemManagedReviewLimit,
       reloadKey: Date.now(),
-      sortMode: hasCustomLimit ? sortMode : 'adaptive',
+      sortMode: hasCustomLimit ? sortMode : 'proficiencyAsc',
       systemManaged: !hasCustomLimit,
     });
   };
@@ -437,10 +452,10 @@ export default function Dictate() {
             <>
               <p className="mt-3 text-xs leading-5 text-[#79747e] dark:text-[#938f99]">
                 {reviewRunConfig?.systemManaged
-                  ? `系统托管本轮最多 ${systemManagedReviewLimit} 词，并按熟练度自动编排。`
+                  ? `系统托管本轮最多 ${systemManagedReviewLimit} 词，并按熟练度从低到高排序。`
                   : reviewRunConfig
                     ? `本轮按手动数量读取 ${reviewRunConfig.limit} 词。`
-                    : `留空时系统最多读取 ${systemManagedReviewLimit} 个到期词并按熟练度自动编排。`}
+                    : `留空时系统最多读取 ${systemManagedReviewLimit} 个到期词并按熟练度从低到高排序。`}
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <div

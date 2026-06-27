@@ -46,7 +46,7 @@ type UseWordsOptions = {
   sortMode?: WordQueueSort;
 };
 
-export type WordQueueSort = 'adaptive' | 'introtimeAsc' | 'introtimeDesc' | 'random';
+export type WordQueueSort = 'proficiencyAsc' | 'proficiencyDesc' | 'introtimeAsc' | 'introtimeDesc' | 'random';
 
 export const allDueReviewBookTagValue = '__all_due_review_words__';
 
@@ -149,9 +149,12 @@ function shuffleWords(words: ReviewWord[]): ReviewWord[] {
   return shuffledWords;
 }
 
-function sortAdaptiveWords(words: ReviewWord[], limit: number): ReviewWord[] {
+function sortByProficiency(words: ReviewWord[], limit: number, direction: 'asc' | 'desc'): ReviewWord[] {
   const now = new Date();
-  return [...words].sort((first, second) => compareByAdaptiveProficiency(first, second, now)).slice(0, limit);
+  const multiplier = direction === 'asc' ? 1 : -1;
+  return [...words]
+    .sort((first, second) => compareByAdaptiveProficiency(first, second, now) * multiplier)
+    .slice(0, limit);
 }
 
 export function useWords(options: UseWordsOptions = {}) {
@@ -223,7 +226,7 @@ export function useWords(options: UseWordsOptions = {}) {
         dueWordsQuery = dueWordsQuery.eq('book_tag', bookTag);
       }
 
-      if (sortMode === 'adaptive') {
+      if (sortMode === 'proficiencyAsc' || sortMode === 'proficiencyDesc') {
         dueWordsQuery = dueWordsQuery
           .order('repetitions', { ascending: true })
           .order('wrong_count', { ascending: false })
@@ -238,7 +241,10 @@ export function useWords(options: UseWordsOptions = {}) {
         dueWordsQuery = dueWordsQuery.order('introtime', { ascending: false });
       }
 
-      const queryLimit = sortMode === 'adaptive' ? Math.min(500, Math.max(limit * 4, limit)) : limit;
+      const queryLimit =
+        sortMode === 'proficiencyAsc' || sortMode === 'proficiencyDesc'
+          ? Math.min(500, Math.max(limit * 4, limit))
+          : limit;
       const dueWordsResult = await dueWordsQuery.limit(queryLimit);
 
       const { data, error } = dueWordsResult;
@@ -251,9 +257,11 @@ export function useWords(options: UseWordsOptions = {}) {
       const nextWords =
         sortMode === 'random'
           ? shuffleWords(loadedWords)
-          : sortMode === 'adaptive'
-            ? sortAdaptiveWords(loadedWords, limit)
-            : loadedWords;
+          : sortMode === 'proficiencyAsc'
+            ? sortByProficiency(loadedWords, limit, 'asc')
+            : sortMode === 'proficiencyDesc'
+              ? sortByProficiency(loadedWords, limit, 'desc')
+              : loadedWords;
 
       setWords(nextWords);
       setCurrentIndex(0);
