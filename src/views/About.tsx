@@ -1,7 +1,7 @@
 import { Shield } from 'lucide-react';
 import type { CSSProperties } from 'react';
 
-const sourceRepositoryUrl = 'https://github.com/zlight106/word-jiffy';
+const sourceRepositoryUrl = 'https://github.com/zlight-GA106/NVVocab#';
 const githubIconPath = '/github-mark-transparent.png';
 const licenseDocumentPath = '/agplv3.txt';
 
