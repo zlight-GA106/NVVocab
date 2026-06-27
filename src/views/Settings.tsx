@@ -526,7 +526,7 @@ export default function Settings() {
         <p className="text-sm font-medium text-[#6750a4] dark:text-[#d0bcff]">系统 Settings</p>
         <h1 className="text-3xl font-normal text-[#1d1b20] dark:text-[#e6e0e9]">系统设置</h1>
         <p className="max-w-3xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-          管理本机 Supabase 节点、动态主题与账户数据清理。
+          管理您的数据库、动态主题与账户数据
         </p>
       </header>
 
@@ -623,7 +623,7 @@ export default function Settings() {
               色彩预设
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-              从角色主题预设中快速切换全站 Material You 色彩。
+              从主题预设中快速切换全站主题色彩
             </p>
           </div>
         </div>

@@ -581,7 +581,7 @@ export default function PrintEditor() {
               <BookOpenText aria-hidden="true" className="size-5" strokeWidth={2} />
             </div>
             <div>
-              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">打印控制指挥部</h2>
+              <h2 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">打印控制</h2>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                 当前词库 {totalCount} 词，本次排版 {filteredCount} 词。
               </p>

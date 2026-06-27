@@ -62,7 +62,7 @@ export default function About() {
           </a>
         </div>
 
-        <p className="mt-8 text-xs text-neutral-400">NVVocab - zlight106 copyright 2026</p>
+        <p className="mt-8 text-xs text-neutral-400">NVVocab © 2026 zlight106</p>
       </section>
     </main>
   );

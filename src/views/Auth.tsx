@@ -77,7 +77,7 @@ export default function Auth() {
               登录后同步你的词库和复习记录
             </h1>
             <p className="max-w-xl text-sm leading-6 text-[#49454f] dark:text-[#cac4d0]">
-              导入词库和默写回写都绑定当前账号
+              导入词库和默写回写都将绑定当前账号
             </p>
           </div>
         </div>
